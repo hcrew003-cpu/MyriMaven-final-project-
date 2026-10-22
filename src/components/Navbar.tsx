@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useCareer } from '../context/CareerContext';
 import { Compass, Sparkles, User, Bookmark, BarChart3, Sliders, LayoutDashboard } from 'lucide-react';
+import { getSupabaseClient } from '../lib/supabase';
 
 export default function Navbar() {
   const {
