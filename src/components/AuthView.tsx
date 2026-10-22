@@ -3,8 +3,10 @@
 
 import { useState } from 'react';
 import { getSupabaseClient } from '../lib/supabase';
+import { useCareer } from '../context/CareerContext';
 
 export default function AuthView() {
+  const { setActiveView } = useCareer();
   const [mode, setMode] = useState<'signup' | 'login'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,9 +43,9 @@ export default function AuthView() {
           password,
         });
 
-        if (error) throw error;
+       if (error) throw error;
 
-        setMessage('You are now signed in!');
+setActiveView('landing');
       }
     } catch (err) {
       setMessage(
