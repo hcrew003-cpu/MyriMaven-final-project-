@@ -122,7 +122,7 @@ async function handleLogout() {
     >
       <button
         onClick={() => {
-          setActiveView('dashboard');
+          setActiveView('profile');
           setIsProfileMenuOpen(false);
         }}
         style={{ display: 'block', width: '100%', padding: 12, textAlign: 'left' }}
