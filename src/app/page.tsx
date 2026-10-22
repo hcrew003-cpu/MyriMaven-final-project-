@@ -16,7 +16,7 @@ import SavedView from '../components/SavedView';
 import CompareView from '../components/CompareView';
 import DashboardView from '../components/DashboardView';
 import WhatIfView from '../components/WhatIfView';
-
+import AuthView from '../components/AuthView';
 function AppContent() {
   const { activeView } = useCareer();
 
@@ -34,6 +34,7 @@ function AppContent() {
         {activeView === 'compare' && <CompareView />}
         {activeView === 'dashboard' && <DashboardView />}
         {activeView === 'what-if' && <WhatIfView />}
+        {activeView === 'auth' && <AuthView />}
       </main>
 
       <Footer />
