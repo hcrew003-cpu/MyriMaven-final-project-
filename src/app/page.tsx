@@ -19,25 +19,58 @@ import WhatIfView from '../components/WhatIfView';
 import AuthView from '../components/AuthView';
 import ProfileView from '../components/ProfileView';
 function AppContent() {
-  const { activeView } = useCareer();
+ const { activeView, authUser, authLoading } = useCareer();
+
+const protectedViews = [
+  'recommendations',
+  'detail',
+  'explore',
+  'saved',
+  'compare',
+  'dashboard',
+  'what-if',
+  'profile',
+];
+
+const requiresLogin = protectedViews.includes(activeView);
+const showLogin = !authLoading && !authUser && requiresLogin;
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar />
 
-      <main className="main-content" style={{ flex: 1 }}>
-        {activeView === 'landing' && <LandingView />}
-        {activeView === 'onboarding' && <OnboardingView />}
-        {activeView === 'recommendations' && <RecommendationsView />}
-        {activeView === 'detail' && <CareerDetailView />}
-        {activeView === 'explore' && <ExploreView />}
-        {activeView === 'saved' && <SavedView />}
-        {activeView === 'compare' && <CompareView />}
-        {activeView === 'dashboard' && <DashboardView />}
-        {activeView === 'what-if' && <WhatIfView />}
-        {activeView === 'auth' && <AuthView />}
-        {activeView === 'profile' && <ProfileView />}
-      </main>
+     
+<main className="main-content" style={{ flex: 1 }}>
+  {authLoading ? (
+    <p style={{ textAlign: 'center', padding: 40 }}>
+      Loading...
+    </p>
+  ) : showLogin ? (
+    <section style={{ maxWidth: 460, margin: '60px auto', padding: 24 }}>
+      <h1>Sign in to see your career results</h1>
+      <p>
+        Your career exploration is ready! Create an account or
+        log in to unlock your recommendations.
+      </p>
+      <AuthView />
+    </section>
+  ) : (
+    <>
+      {activeView === 'landing' && <LandingView />}
+      {activeView === 'onboarding' && <OnboardingView />}
+      {activeView === 'recommendations' && <RecommendationsView />}
+      {activeView === 'detail' && <CareerDetailView />}
+      {activeView === 'explore' && <ExploreView />}
+      {activeView === 'saved' && <SavedView />}
+      {activeView === 'compare' && <CompareView />}
+      {activeView === 'dashboard' && <DashboardView />}
+      {activeView === 'what-if' && <WhatIfView />}
+      {activeView === 'auth' && <AuthView />}
+      {activeView === 'profile' && <ProfileView />}
+    </>
+  )}
+</main>
+
 
       <Footer />
       <MayaDrawer />
