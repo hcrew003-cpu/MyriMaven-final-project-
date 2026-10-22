@@ -58,5 +58,6 @@ export type ViewType =
   | 'saved'
   | 'compare'
   | 'dashboard'
+  | 'profile'
   | 'what-if'
   | 'auth';
