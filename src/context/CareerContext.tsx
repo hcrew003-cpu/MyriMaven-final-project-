@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Career, UserProfile, WhatIfState, ViewType } from '../types/career';
 import { CAREERS, INITIAL_USER_PROFILE } from '../data/careersData';
-
+import type { User } from '@supabase/supabase-js';
+import { getSupabaseClient } from '../lib/supabase';
 interface CareerContextType {
   activeView: ViewType;
   setActiveView: (view: ViewType) => void;
