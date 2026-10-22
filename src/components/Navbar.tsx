@@ -15,7 +15,20 @@ export default function Navbar() {
   authUser,
   authLoading,
 } = useCareer();
+const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
+async function handleLogout() {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    alert('Could not log out: ' + error.message);
+    return;
+  }
+
+  setIsProfileMenuOpen(false);
+  setActiveView('landing');
+}
   return (
     <nav className="navbar">
       <div className="nav-container">
@@ -76,13 +89,57 @@ export default function Navbar() {
               >
                 <Sparkles size={16} className="sparkle-icon" />
                 <span>Ask Maya</span>
-              </button>
+              
+<div style={{ position: 'relative' }}>
+  <button
+    onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+    className="user-badge"
+    title="Open Account Menu"
+    aria-expanded={isProfileMenuOpen}
+  >
+    <div className="avatar-circle">
+      {(authUser.email?.charAt(0) || 'U').toUpperCase()}
+    </div>
+    <span>{authUser.email?.split('@')[0] || 'My Account'}</span>
+    <span>⌄</span>
+  </button>
 
-              <button
-                onClick={() => setActiveView('dashboard')}
-                className="user-badge"
-                title="View User Profile"
-              >
+  {isProfileMenuOpen && (
+    <div
+      style={{
+        position: 'absolute',
+        top: '100%',
+        right: 0,
+        marginTop: 8,
+        background: 'white',
+        border: '1px solid #ddd',
+        borderRadius: 12,
+        padding: 8,
+        minWidth: 180,
+        boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+        zIndex: 1000,
+      }}
+    >
+      <button
+        onClick={() => {
+          setActiveView('dashboard');
+          setIsProfileMenuOpen(false);
+        }}
+        style={{ display: 'block', width: '100%', padding: 12, textAlign: 'left' }}
+      >
+        My Profile
+      </button>
+
+      <button
+        onClick={handleLogout}
+        style={{ display: 'block', width: '100%', padding: 12, textAlign: 'left' }}
+      >
+        Log Out
+      </button>
+    </div>
+  )}
+</div>
+
                 <div className="avatar-circle">
                   {(authUser.email?.charAt(0) || 'U').toUpperCase()}
                 </div>
