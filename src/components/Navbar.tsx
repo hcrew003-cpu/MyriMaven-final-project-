@@ -79,6 +79,13 @@ export default function Navbar() {
         {/* Right Actions */}
         <div className="nav-actions">
           <button
+  onClick={() => setActiveView('auth')}
+  className="nav-link-btn"
+  title="Sign Up or Log In"
+>
+  Sign Up / Log In
+</button>
+          <button
             onClick={() => setIsMayaOpen(true)}
             className="maya-nav-btn"
             title="Ask Maya AI Guide"
