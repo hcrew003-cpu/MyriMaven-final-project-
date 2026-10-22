@@ -16,8 +16,6 @@ export default function Navbar() {
 } = useCareer();
 
   return (
-    
-  return (
     <nav className="navbar">
       <div className="nav-container">
         {/* MyriMaven Logo */}
