@@ -45,7 +45,7 @@ export default function AuthView() {
 
        if (error) throw error;
 
-setActiveView('landing');
+setActiveView('profile');
       }
     } catch (err) {
       setMessage(
