@@ -6,7 +6,7 @@ import { getSupabaseClient } from '../lib/supabase';
 import { useCareer } from '../context/CareerContext';
 
 export default function AuthView() {
-  const { setActiveView } = useCareer();
+  const { activeView, setActiveView } = useCareer();
   const [mode, setMode] = useState<'signup' | 'login'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,7 +45,9 @@ export default function AuthView() {
 
        if (error) throw error;
 
-setActiveView('profile');
+setActiveView(
+  activeView === 'recommendations' ? 'recommendations' : 'profile'
+);
       }
     } catch (err) {
       setMessage(
