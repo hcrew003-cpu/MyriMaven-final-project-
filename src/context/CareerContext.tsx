@@ -7,6 +7,8 @@ import type { User } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../lib/supabase';
 interface CareerContextType {
   activeView: ViewType;
+  authUser: User | null;
+  authLoading: boolean;
   setActiveView: (view: ViewType) => void;
   selectedCareerId: string;
   setSelectedCareerId: (id: string) => void;
@@ -34,6 +36,30 @@ const CareerContext = createContext<CareerContextType | undefined>(undefined);
 
 export function CareerProvider({ children }: { children: React.ReactNode }) {
   const [activeView, setActiveView] = useState<ViewType>('landing');
+  
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setAuthUser(session?.user ?? null);
+        setAuthLoading(false);
+      }
+    );
+
+    supabase.auth.getUser().then(({ data }) => {
+      setAuthUser(data.user);
+      setAuthLoading(false);
+    }).catch(() => {
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   const [selectedCareerId, setSelectedCareerId] = useState<string>('marketing-manager');
   const [savedCareerIds, setSavedCareerIds] = useState<string[]>([
     'marketing-manager',
@@ -138,6 +164,8 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
   return (
     <CareerContext.Provider
       value={{
+         authUser,
+    authLoading,
         activeView,
         setActiveView,
         selectedCareerId,
