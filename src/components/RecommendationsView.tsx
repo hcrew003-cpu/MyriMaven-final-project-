@@ -41,22 +41,25 @@ useEffect(() => {
       }
 
       const convertedCareers = data.map((career) => {
-        const existingCareer = CAREERS.find(
-          (c) => c.id === career.id || c.title === career.title
-        );
+     
+const convertedCareers = data.map((career) => {
+  const existingCareer = CAREERS.find(
+    (c) => c.id === career.id || c.title === career.title
+  );
 
-        return {
-          ...existingCareer,
-          id: career.id,
-          title: career.title,
-          category: career.category ?? '',
-          baseMatch: career.base_match ?? 0,
-          description: career.description ?? '',
-          mayFitBecause: career.may_fit_because ?? '',
-          watchOut: career.watch_out ?? '',
-          tags: existingCareer?.tags ?? [],
-        };
-      });
+  return {
+    ...(existingCareer ?? CAREERS[0]),
+    id: career.id,
+    title: career.title,
+    category: career.category ?? '',
+    baseMatch: career.base_match ?? 0,
+    description: career.description ?? '',
+    mayFitBecause: career.may_fit_because ?? '',
+    watchOut: career.watch_out ?? '',
+    tags: existingCareer?.tags ?? [],
+  };
+});
+
 
       if (!cancelled) {
         setCareers(convertedCareers);
