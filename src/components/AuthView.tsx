@@ -58,6 +58,44 @@ setActiveView(
     }
   }
 
+async function handleMagicLink() {
+  setMessage('');
+
+  if (!email.trim()) {
+    setMessage('Please enter your email address first.');
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const supabase = getSupabaseClient();
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo: window.location.origin,
+        shouldCreateUser: false,
+      },
+    });
+
+    if (error) throw error;
+
+    setMessage(
+      'Check your email! We sent you a magic link to sign in.'
+    );
+  } catch (err) {
+    setMessage(
+      err instanceof Error
+        ? err.message
+        : 'Could not send magic link. Please try again.'
+    );
+  } finally {
+    setLoading(false);
+  }
+}
+
+
   async function handleGoogleSignIn() {
     setLoading(true);
     setMessage('');
@@ -128,6 +166,22 @@ setActiveView(
       <button type="button" disabled={loading} onClick={handleGoogleSignIn}>
         Continue with Google
       </button>
+
+<button
+  type="button"
+  disabled={loading}
+  onClick={handleMagicLink}
+  style={{
+    display: 'block',
+    width: '100%',
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 8,
+    cursor: loading ? 'not-allowed' : 'pointer',
+  }}
+>
+  Email Me a Magic Link
+</button>
 
       <p role="status" aria-live="polite">{message}</p>
 
