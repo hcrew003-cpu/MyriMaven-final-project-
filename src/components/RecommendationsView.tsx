@@ -128,7 +128,7 @@ useEffect(() => {
           {/* Filter Pills */}
           <div style={{ display: 'flex', gap: '8px', marginTop: '24px', flexWrap: 'wrap' }}>
             {[
-              { id: 'all', label: `All Matches (${careers.length})`,
+              { id: 'all', label: `All Matches (${careers.length})` },
               { id: 'high', label: 'Top Matches (90%+)' },
               { id: 'creative', label: 'Creative & Design' },
               { id: 'business', label: 'Business & Leadership' },
