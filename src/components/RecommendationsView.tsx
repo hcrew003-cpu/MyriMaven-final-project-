@@ -5,7 +5,6 @@ import React, { useEffect, useState } from 'react';
 import { useCareer } from '../context/CareerContext';
 import { CAREERS } from '../data/careersData';
 import { getSupabaseClient } from '../lib/supabase';
-import type { Career } from '../types';
 import { Sliders, BarChart3, Bookmark, ChevronRight } from 'lucide-react';
 
 export default function RecommendationsView() {
@@ -24,7 +23,7 @@ export default function RecommendationsView() {
     'all' | 'high' | 'creative' | 'business' | 'tech'
   >('all');
 
-  const [careers, setCareers] = useState<Career[]>(CAREERS);
+  const [careers, setCareers] = useState(CAREERS);
   const [dataSource, setDataSource] = useState<
     'loading' | 'supabase' | 'fallback'
   >('loading');
@@ -50,7 +49,7 @@ export default function RecommendationsView() {
           throw new Error('No career records found in Supabase');
         }
 
-        const convertedCareers: Career[] = data.map((career) => {
+        const convertedCareers = data.map((career) => {
           const existingCareer = CAREERS.find(
             (c) => c.id === career.id || c.title === career.title
           );
