@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCareer } from '../context/CareerContext';
 import { CAREERS } from '../data/careersData';
+import { getSupabaseClient } from '../lib/supabase';
 import { Sliders, BarChart3, Bookmark, ChevronRight, Check, ArrowRight } from 'lucide-react';
 
 export default function RecommendationsView() {
@@ -19,8 +20,65 @@ export default function RecommendationsView() {
   } = useCareer();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'high' | 'creative' | 'business' | 'tech'>('all');
+const [careers, setCareers] = useState(CAREERS);
+const [dataSource, setDataSource] = useState<'loading' | 'supabase' | 'fallback'>('loading');
 
-  const filteredCareers = CAREERS.filter((c) => {
+useEffect(() => {
+  let cancelled = false;
+
+  async function loadCareers() {
+    try {
+      const supabase = getSupabaseClient();
+
+      const { data, error } = await supabase
+        .from('careers')
+        .select('id, title, category, base_match, description, may_fit_because, watch_out');
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        throw new Error('No careers found in Supabase');
+      }
+
+      const convertedCareers = data.map((career) => {
+        const existingCareer = CAREERS.find(
+          (c) => c.id === career.id || c.title === career.title
+        );
+
+        return {
+          ...existingCareer,
+          id: career.id,
+          title: career.title,
+          category: career.category ?? '',
+          baseMatch: career.base_match ?? 0,
+          description: career.description ?? '',
+          mayFitBecause: career.may_fit_because ?? '',
+          watchOut: career.watch_out ?? '',
+          tags: existingCareer?.tags ?? [],
+        };
+      });
+
+      if (!cancelled) {
+        setCareers(convertedCareers);
+        setDataSource('supabase');
+      }
+    } catch (error) {
+      console.error('Unable to load careers from Supabase:', error);
+
+      if (!cancelled) {
+        setCareers(CAREERS);
+        setDataSource('fallback');
+      }
+    }
+  }
+
+  loadCareers();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
+  const filteredCareers = careers.filter((c) => {
     if (activeFilter === 'high') return c.baseMatch >= 90;
     if (activeFilter === 'creative') return c.category.toLowerCase().includes('creative');
     if (activeFilter === 'business') return c.category.toLowerCase().includes('business');
@@ -70,7 +128,7 @@ export default function RecommendationsView() {
           {/* Filter Pills */}
           <div style={{ display: 'flex', gap: '8px', marginTop: '24px', flexWrap: 'wrap' }}>
             {[
-              { id: 'all', label: `All Matches (${CAREERS.length})` },
+              { id: 'all', label: `All Matches (${careers.length})`,
               { id: 'high', label: 'Top Matches (90%+)' },
               { id: 'creative', label: 'Creative & Design' },
               { id: 'business', label: 'Business & Leadership' },
@@ -96,7 +154,13 @@ export default function RecommendationsView() {
             ))}
           </div>
         </div>
-
+<p style={{ fontSize: '0.85rem', marginBottom: '16px', color: 'var(--text-muted)' }}>
+  {dataSource === 'loading'
+    ? 'Loading career data...'
+    : dataSource === 'supabase'
+      ? 'Career data loaded from Supabase'
+      : 'Showing sample career data'}
+</p>
         {/* Career Grid */}
         <div style={{
           display: 'grid',
