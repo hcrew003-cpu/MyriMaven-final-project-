@@ -164,24 +164,32 @@ export default function OnboardingView() {
                 Where are you in your journey right now?
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-                {['High school student', 'College / University', 'Early career', 'Career switcher'].map((stage, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    style={{
-                      padding: '12px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      border: idx === 1 ? '2px solid var(--primary)' : '1px solid var(--border-strong)',
-                      backgroundColor: idx === 1 ? 'var(--primary-subtle)' : 'white',
-                      fontWeight: 600,
-                      color: idx === 1 ? 'var(--primary)' : 'var(--dark-slate)',
-                      textAlign: 'center',
-                      fontSize: '0.9rem'
-                    }}
-                  >
-                    {stage}
-                  </button>
-                ))}
+               
+{['High school student', 'College / University', 'Recent graduate', 'Career switcher'].map((stage) => {
+  const selected = userProfile.careerStage === stage;
+
+  return (
+    <button
+      key={stage}
+      type="button"
+      onClick={() => updateUserProfile({ careerStage: stage })}
+      aria-pressed={selected}
+      style={{
+        padding: '12px 14px',
+        borderRadius: 'var(--radius-md)',
+        border: selected ? '2px solid var(--primary)' : '1px solid var(--border-strong)',
+        backgroundColor: selected ? 'var(--primary-subtle)' : 'white',
+        fontWeight: 600,
+        color: selected ? 'var(--primary)' : 'var(--dark-slate)',
+        textAlign: 'center',
+        fontSize: '0.9rem'
+      }}
+    >
+      {stage}
+    </button>
+  );
+})}
+
               </div>
             </div>
 
