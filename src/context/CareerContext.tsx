@@ -106,6 +106,43 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
     'marketing-manager', 'product-designer', 'project-manager',
   ]);
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+useEffect(() => {
+  let cancelled = false;
+
+  if (!authUser) {
+    setUserProfile(INITIAL_USER_PROFILE);
+    setProfileLoading(false);
+    return;
+  }
+
+  setProfileLoading(true);
+
+  // Clear the previous account's information before loading this one.
+  setUserProfile(INITIAL_USER_PROFILE);
+
+  loadUserProfile(authUser)
+    .then((profile) => {
+      if (!cancelled && profile) {
+        setUserProfile(profile);
+      }
+    })
+    .catch((error) => {
+      if (!cancelled) {
+        console.error('Failed to load user profile:', error);
+      }
+    })
+    .finally(() => {
+      if (!cancelled) {
+        setProfileLoading(false);
+      }
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, [authUser?.id]);
   const [whatIfToggles, setWhatIfToggles] = useState<WhatIfState>({
     growth: true,
     leadership: true,
