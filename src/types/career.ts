@@ -26,6 +26,7 @@ export interface Career {
 
 export interface UserProfile {
   name: string;
+  careerStage: string;
   interests: string[];
   skills: { [skillName: string]: number };
   preferences: {
