@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import './globals.css';
 
+
 export const metadata: Metadata = {
-  title: 'MyriMaven | AI Career Exploration Sandbox',
+  title: 'Career Sandbox | Explore Your Future',
   description:
-    'Explore careers, discover your authentic path, and test life priorities in a real-time sandbox with Maya, your transparent AI guide.',
+    'Explore career possibilities, discover your strengths, and experiment with different career priorities in an interactive career exploration sandbox.',
 };
 
 export default function RootLayout({
