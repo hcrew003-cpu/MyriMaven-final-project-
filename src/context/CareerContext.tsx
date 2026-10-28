@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Career, UserProfile, WhatIfState, ViewType } from '../types/career';
 import { CAREERS, INITIAL_USER_PROFILE } from '../data/careersData';
 import type { User } from '@supabase/supabase-js';
@@ -35,7 +35,55 @@ interface CareerContextType {
 const CareerContext = createContext<CareerContextType | undefined>(undefined);
 
 export function CareerProvider({ children }: { children: React.ReactNode }) {
-  const [activeView, setActiveView] = useState<ViewType>('landing');
+  
+const [activeView, setActiveViewState] = useState<ViewType>('landing');
+
+// All screens that can be displayed by the app
+const validViews: ViewType[] = [
+  'landing',
+  'onboarding',
+  'recommendations',
+  'detail',
+  'explore',
+  'saved',
+  'compare',
+  'dashboard',
+  'what-if',
+  'auth',
+  'profile',
+];
+
+// Navigate to a screen and record it in browser history
+const setActiveView = useCallback((view: ViewType) => {
+  setActiveViewState(view);
+
+  const url = new URL(window.location.href);
+  url.hash = view === 'landing' ? '' : view;
+
+  window.history.pushState({ view }, '', url.toString());
+}, []);
+
+// Restore the correct screen when Back or Forward is pressed
+useEffect(() => {
+  const getViewFromUrl = (): ViewType => {
+    const view = window.location.hash.replace('#', '') as ViewType;
+    return validViews.includes(view) ? view : 'landing';
+  };
+
+  // Handle direct links and page refreshes
+  setActiveViewState(getViewFromUrl());
+
+  const handlePopState = () => {
+    setActiveViewState(getViewFromUrl());
+  };
+
+  window.addEventListener('popstate', handlePopState);
+
+  return () => {
+    window.removeEventListener('popstate', handlePopState);
+  };
+}, []);
+
   
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
