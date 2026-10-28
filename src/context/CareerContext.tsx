@@ -5,6 +5,7 @@ import { Career, UserProfile, WhatIfState, ViewType } from '../types/career';
 import { CAREERS, INITIAL_USER_PROFILE } from '../data/careersData';
 import type { User } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../lib/supabase';
+
 interface CareerContextType {
   activeView: ViewType;
   authUser: User | null;
@@ -35,89 +36,74 @@ interface CareerContextType {
 const CareerContext = createContext<CareerContextType | undefined>(undefined);
 
 export function CareerProvider({ children }: { children: React.ReactNode }) {
-  
-const [activeView, setActiveViewState] = useState<ViewType>('landing');
+  const [activeView, setActiveViewState] = useState<ViewType>('landing');
 
-// All screens that can be displayed by the app
-const validViews: ViewType[] = [
-  'landing',
-  'onboarding',
-  'recommendations',
-  'detail',
-  'explore',
-  'saved',
-  'compare',
-  'dashboard',
-  'what-if',
-  'auth',
-  'profile',
-];
+  const validViews: ViewType[] = [
+    'landing', 'onboarding', 'recommendations', 'detail', 'explore',
+    'saved', 'compare', 'dashboard', 'what-if', 'auth', 'profile',
+  ];
 
-// Navigate to a screen and record it in browser history
-const setActiveView = useCallback((view: ViewType) => {
-  setActiveViewState(view);
+  const setActiveView = useCallback((view: ViewType) => {
+    setActiveViewState(view);
+    const url = new URL(window.location.href);
+    url.hash = view === 'landing' ? '' : view;
+    window.history.pushState({ view }, '', url.toString());
+  }, []);
 
-  const url = new URL(window.location.href);
-  url.hash = view === 'landing' ? '' : view;
-
-  window.history.pushState({ view }, '', url.toString());
-}, []);
-
-// Restore the correct screen when Back or Forward is pressed
-useEffect(() => {
-  const getViewFromUrl = (): ViewType => {
-    const view = window.location.hash.replace('#', '') as ViewType;
-    return validViews.includes(view) ? view : 'landing';
-  };
-
-  // Handle direct links and page refreshes
-  setActiveViewState(getViewFromUrl());
-
-  const handlePopState = () => {
+  useEffect(() => {
+    const getViewFromUrl = (): ViewType => {
+      const view = window.location.hash.replace('#', '') as ViewType;
+      return validViews.includes(view) ? view : 'landing';
+    };
     setActiveViewState(getViewFromUrl());
-  };
+    const handlePopState = () => setActiveViewState(getViewFromUrl());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
-  window.addEventListener('popstate', handlePopState);
-
-  return () => {
-    window.removeEventListener('popstate', handlePopState);
-  };
-}, []);
-
-  
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
 
+    // Only redirect after Google OAuth, not whenever an existing session refreshes.
+    const finishGoogleRedirect = (user: User | null) => {
+      if (!user || sessionStorage.getItem('careerSandboxGoogleRedirect') !== 'dashboard') return;
+      sessionStorage.removeItem('careerSandboxGoogleRedirect');
+      setActiveView('dashboard');
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setAuthUser(session?.user ?? null);
+        const user = session?.user ?? null;
+        setAuthUser(user);
         setAuthLoading(false);
+        // Supabase may emit SIGNED_IN or INITIAL_SESSION on the return from OAuth.
+        // Schedule navigation outside the auth callback to avoid re-entrant auth work.
+        if (user && sessionStorage.getItem('careerSandboxGoogleRedirect') === 'dashboard') {
+          setTimeout(() => finishGoogleRedirect(user), 0);
+        }
       }
     );
 
     supabase.auth.getUser().then(({ data }) => {
       setAuthUser(data.user);
       setAuthLoading(false);
+      finishGoogleRedirect(data.user);
     }).catch(() => {
       setAuthLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [setActiveView]);
 
   const [selectedCareerId, setSelectedCareerId] = useState<string>('marketing-manager');
   const [savedCareerIds, setSavedCareerIds] = useState<string[]>([
-    'marketing-manager',
-    'product-designer',
-    'project-manager',
+    'marketing-manager', 'product-designer', 'project-manager',
   ]);
   const [compareCareerIds, setCompareCareerIds] = useState<string[]>([
-    'marketing-manager',
-    'product-designer',
-    'project-manager',
+    'marketing-manager', 'product-designer', 'project-manager',
   ]);
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
   const [whatIfToggles, setWhatIfToggles] = useState<WhatIfState>({
@@ -133,7 +119,6 @@ useEffect(() => {
   const [mayaPrompt, setMayaPrompt] = useState<string>('');
   const [onboardingStep, setOnboardingStep] = useState<number>(1);
 
-  // Selected Career Object
   const selectedCareer =
     CAREERS.find((c) => c.id === selectedCareerId) || CAREERS[0];
 
@@ -142,7 +127,6 @@ useEffect(() => {
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
-
   const isSaved = (id: string) => savedCareerIds.includes(id);
 
   const toggleCompareCareer = (id: string) => {
@@ -151,35 +135,26 @@ useEffect(() => {
         return prev.filter((item) => item !== id);
       } else {
         if (prev.length >= 3) {
-          // Replace the last one if we already have 3
           return [prev[0], prev[1], id];
         }
         return [...prev, id];
       }
     });
   };
-
   const isComparing = (id: string) => compareCareerIds.includes(id);
 
   const updateUserProfile = (updates: Partial<UserProfile>) => {
     setUserProfile((prev) => ({ ...prev, ...updates }));
   };
-
   const toggleWhatIf = (key: keyof WhatIfState) => {
-    setWhatIfToggles((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+    setWhatIfToggles((prev) => ({ ...prev, [key]: !prev[key] }));
   };
-
   const openMayaWithPrompt = (prompt: string) => {
     setMayaPrompt(prompt);
     setIsMayaOpen(true);
   };
 
-  // Helper for Sandbox Dynamic Scoring
   const getWhatIfRankedCareers = () => {
-    // When Work-life balance and Helping others are prioritized, healthcare and education rise
     return CAREERS.map((c) => {
       let score = c.baseMatch;
       let delta: number | 'NEW' = 0;
@@ -199,7 +174,6 @@ useEffect(() => {
           delta = 5;
         }
       }
-
       return {
         ...c,
         dynamicScore: Math.min(99, Math.max(50, score)),
@@ -212,30 +186,15 @@ useEffect(() => {
   return (
     <CareerContext.Provider
       value={{
-         authUser,
-    authLoading,
-        activeView,
-        setActiveView,
-        selectedCareerId,
-        setSelectedCareerId,
-        selectedCareer,
-        savedCareerIds,
-        toggleSaveCareer,
-        isSaved,
-        compareCareerIds,
-        toggleCompareCareer,
-        isComparing,
-        userProfile,
-        updateUserProfile,
-        whatIfToggles,
-        toggleWhatIf,
-        isMayaOpen,
-        setIsMayaOpen,
-        mayaPrompt,
-        openMayaWithPrompt,
-        onboardingStep,
-        setOnboardingStep,
-        getWhatIfRankedCareers,
+        authUser, authLoading,
+        activeView, setActiveView,
+        selectedCareerId, setSelectedCareerId, selectedCareer,
+        savedCareerIds, toggleSaveCareer, isSaved,
+        compareCareerIds, toggleCompareCareer, isComparing,
+        userProfile, updateUserProfile,
+        whatIfToggles, toggleWhatIf,
+        isMayaOpen, setIsMayaOpen, mayaPrompt, openMayaWithPrompt,
+        onboardingStep, setOnboardingStep, getWhatIfRankedCareers,
       }}
     >
       {children}
