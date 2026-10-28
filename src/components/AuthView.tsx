@@ -29,7 +29,7 @@ export default function AuthView() {
         if (error) throw error;
 
         if (data.session) {
-          setActiveView(activeView === 'recommendations' ? 'recommendations' : 'profile');
+         setActiveView('dashboard'); 
         } else {
           setMessage('Account created! Please check your email to confirm your account, then log in.');
         }
@@ -39,7 +39,7 @@ export default function AuthView() {
           password,
         });
         if (error) throw error;
-        setActiveView(activeView === 'recommendations' ? 'recommendations' : 'profile');
+       setActiveView('dashboard');
       }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
