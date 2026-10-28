@@ -207,7 +207,7 @@ export default function OnboardingView() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button
-                onClick={() => setOnboardingStep(2)}
+                onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(2)}
                 className="btn-primary"
                 style={{ padding: '14px 28px' }}
               >
@@ -278,7 +278,7 @@ export default function OnboardingView() {
                 <span>Back</span>
               </button>
               <button
-                onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(3)}
+                onClick={() => setOnboardingStep(3)}
                 disabled={userProfile.interests.length < 3}
                 className="btn-primary"
                 style={{ opacity: userProfile.interests.length < 3 ? 0.6 : 1 }}
@@ -363,7 +363,7 @@ export default function OnboardingView() {
                 onClick={() => setOnboardingStep(4)}
                 className="btn-primary"
               >
-                <<span>{editingSection ? 'Save & Return' : 'Next: Work Preferences'}</span>
+                <span>{editingSection ? 'Save & Return' : 'Next: Work Preferences'}</span>
                 <ArrowRight size={18} />
               </button>
             </div>
@@ -649,7 +649,7 @@ export default function OnboardingView() {
       Your Career Stage
     </h3>
     <button
-      onClick={() => setOnboardingStep(1)}
+      onClick={() => openEditor(1)}
       className="btn-ghost"
       style={{ fontSize: '0.85rem' }}
     >
@@ -667,7 +667,7 @@ export default function OnboardingView() {
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--dark-slate)' }}>
                     Curiosity Areas ({userProfile.interests.length})
                   </h3>
-                  <button onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(2)} className="btn-ghost" style={{ fontSize: '0.85rem' }}>
+                  <button onClick={() => openEditor(2)} className="btn-ghost" style={{ fontSize: '0.85rem' }}>
                     <Edit2 size={14} /> Edit
                   </button>
                 </div>
@@ -684,7 +684,7 @@ export default function OnboardingView() {
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--dark-slate)' }}>
                     Top Strengths
                   </h3>
-                  <button onClick={() => setOnboardingStep(3)} className="btn-ghost" style={{ fontSize: '0.85rem' }}>
+                  <button onClick={() => openEditor(3)} className="btn-ghost" style={{ fontSize: '0.85rem' }}>
                     <Edit2 size={14} /> Edit
                   </button>
                 </div>
@@ -705,7 +705,7 @@ export default function OnboardingView() {
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--dark-slate)' }}>
                     Work Style Tendencies
                   </h3>
-                  <button onClick={() => setOnboardingStep(4)} className="btn-ghost" style={{ fontSize: '0.85rem' }}>
+                  <button onClick={() => openEditor(4)} className="btn-ghost" style={{ fontSize: '0.85rem' }}>
                     <Edit2 size={14} /> Edit
                   </button>
                 </div>
@@ -731,7 +731,7 @@ export default function OnboardingView() {
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--dark-slate)' }}>
                     Top Career Priorities
                   </h3>
-                  <button onClick={() => setOnboardingStep(5)} className="btn-ghost" style={{ fontSize: '0.85rem' }}>
+                  <button onClick={() => openEditor(5)} className="btn-ghost" style={{ fontSize: '0.85rem' }}>
                     <Edit2 size={14} /> Edit
                   </button>
                 </div>
