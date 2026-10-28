@@ -40,15 +40,46 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 export default function OnboardingView() {
-  const {
-    onboardingStep,
-    setOnboardingStep,
-    userProfile,
-    updateUserProfile,
-    setActiveView,
-  } = useCareer();
+ const {
+  onboardingStep,
+  setOnboardingStep,
+  userProfile,
+  updateUserProfile,
+  setActiveView,
+  saveProfile,
+  authUser,
+} = useCareer();
 
   const [editingSection, setEditingSection] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+const [saveError, setSaveError] = useState('');
+
+const handleGenerateRecommendations = async () => {
+  if (isSaving) return;
+
+  setSaveError('');
+
+  if (!authUser) {
+    setSaveError('Please sign in before generating your recommendations.');
+    return;
+  }
+
+  setIsSaving(true);
+
+  try {
+    await saveProfile();
+    setActiveView('recommendations');
+  } catch (error) {
+    console.error('Failed to save onboarding profile:', error);
+    setSaveError(
+      error instanceof Error
+        ? error.message
+        : 'Something went wrong while saving your profile. Please try again.'
+    );
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const openEditor = (step: number) => {
     setEditingSection(true);
@@ -768,18 +799,36 @@ export default function OnboardingView() {
             </div>
 
             <div style={{ textAlign: 'center' }}>
-              <button
-                onClick={() => setActiveView('recommendations')}
-                className="btn-primary"
-                style={{ padding: '16px 40px', fontSize: '1.15rem' }}
-              >
-                <span>Generate My Recommendations</span>
-                <ArrowRight size={20} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+  {saveError && (
+    <p
+      role="alert"
+      style={{
+        color: '#b91c1c',
+        marginBottom: '16px',
+        fontWeight: 600,
+      }}
+    >
+      {saveError}
+    </p>
+  )}
+
+  <button
+    onClick={handleGenerateRecommendations}
+    disabled={isSaving}
+    className="btn-primary"
+    style={{
+      padding: '16px 40px',
+      fontSize: '1.15rem',
+      opacity: isSaving ? 0.6 : 1,
+      cursor: isSaving ? 'not-allowed' : 'pointer',
+    }}
+  >
+    <span>
+      {isSaving ? 'Saving Your Profile...' : 'Generate My Recommendations'}
+    </span>
+    {!isSaving && <ArrowRight size={20} />}
+  </button>
+</div>
     </div>
   );
 }
