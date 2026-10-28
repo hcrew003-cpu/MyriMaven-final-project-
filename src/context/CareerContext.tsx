@@ -22,6 +22,7 @@ interface CareerContextType {
   isComparing: (id: string) => boolean;
   userProfile: UserProfile;
   updateUserProfile: (updates: Partial<UserProfile>) => void;
+  saveProfile: () => Promise<void>;
   whatIfToggles: WhatIfState;
   toggleWhatIf: (key: keyof WhatIfState) => void;
   isMayaOpen: boolean;
@@ -183,6 +184,17 @@ useEffect(() => {
   const updateUserProfile = (updates: Partial<UserProfile>) => {
     setUserProfile((prev) => ({ ...prev, ...updates }));
   };
+  const saveProfile = async () => {
+  if (!authUser) {
+    throw new Error('Please sign in to save your profile.');
+  }
+
+  if (profileLoading) {
+    throw new Error('Please wait for your profile to finish loading.');
+  }
+
+  await saveUserProfile(authUser, userProfile);
+};
   const toggleWhatIf = (key: keyof WhatIfState) => {
     setWhatIfToggles((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -228,7 +240,7 @@ useEffect(() => {
         selectedCareerId, setSelectedCareerId, selectedCareer,
         savedCareerIds, toggleSaveCareer, isSaved,
         compareCareerIds, toggleCompareCareer, isComparing,
-        userProfile, updateUserProfile,
+        userProfile, updateUserProfile, saveProfile,
         whatIfToggles, toggleWhatIf,
         isMayaOpen, setIsMayaOpen, mayaPrompt, openMayaWithPrompt,
         onboardingStep, setOnboardingStep, getWhatIfRankedCareers,
