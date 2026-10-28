@@ -21,7 +21,7 @@ export default function Footer() {
             <div className="brand-icon" style={{ width: '28px', height: '28px' }}>
               <Compass size={16} />
             </div>
-            <span style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '1.1rem' }}>MyriMaven</span>
+            <span style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '1.1rem' }}>Career Sandbox</span>
             <span style={{ color: 'var(--text-subtle)' }}>· Career Exploration Sandbox</span>
           </div>
 
