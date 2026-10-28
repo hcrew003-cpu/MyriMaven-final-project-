@@ -41,16 +41,16 @@ export default function Navbar() {
     <nav className="navbar">
       <div className="nav-container">
 
-        {/* MyriMaven Logo */}
+        {/* Career Sandbox Logo */}
         <button
           onClick={() => setActiveView('landing')}
           className="brand-logo"
-          title="Return to MyriMaven Home"
+          title="Return to Career Sandbox Home"
         >
           <div className="brand-icon">
             <Compass size={20} />
           </div>
-          <span>MyriMaven</span>
+          <span>Career Sandbox</span>
         </button>
 
         {/* Navigation for logged-in users */}
