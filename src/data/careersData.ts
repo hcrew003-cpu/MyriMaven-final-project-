@@ -1,8 +1,11 @@
 import { Career, UserProfile } from '../types/career';
 
+
 export const INITIAL_USER_PROFILE: UserProfile = {
   name: 'Priya',
+  careerStage: 'College / University',
   interests: ['Technology', 'Business', 'Creativity', 'Problem Solving', 'Leadership', 'Communication'],
+
   skills: {
     'Communication': 5,
     'Leadership': 4,
