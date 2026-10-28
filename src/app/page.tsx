@@ -5,7 +5,7 @@ import { CareerProvider, useCareer } from '../context/CareerContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import MayaDrawer from '../components/MayaDrawer';
-import PrototypeNav from '../components/PrototypeNav';
+
 
 import LandingView from '../components/LandingView';
 import OnboardingView from '../components/OnboardingView';
@@ -72,9 +72,8 @@ const showLogin = !authLoading && !authUser && requiresLogin;
 </main>
 
 
-      <Footer />
-      <MayaDrawer />
-      <PrototypeNav />
+           <Footer />
+      <MayaDrawer /> 
     </div>
   );
 }
