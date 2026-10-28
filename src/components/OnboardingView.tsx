@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useCareer } from '../context/CareerContext';
 import { ALL_INTERESTS, ALL_SKILLS, ALL_GOALS } from '../data/careersData';
 import {
@@ -47,6 +47,18 @@ export default function OnboardingView() {
     updateUserProfile,
     setActiveView,
   } = useCareer();
+
+  const [editingSection, setEditingSection] = useState(false);
+
+  const openEditor = (step: number) => {
+    setEditingSection(true);
+    setOnboardingStep(step);
+  };
+
+  const saveAndReturn = () => {
+    setEditingSection(false);
+    setOnboardingStep(6);
+  };
 
   const handleInterestToggle = (label: string) => {
     const current = userProfile.interests;
@@ -199,34 +211,14 @@ export default function OnboardingView() {
                 className="btn-primary"
                 style={{ padding: '14px 28px' }}
               >
-                <span>Next: Your Interests</span>
+                <span>{editingSection ? 'Save & Return' : 'Next: Your Interests'}</span>
                 <ArrowRight size={18} />
               </button>
             </div>
           </div>
         )}
 
-{/* Return to Summary when editing a section */}
-{onboardingStep >= 1 && onboardingStep <= 5 && (
-  <div style={{
-    display: 'flex',
-    justifyContent: 'center',
-    marginTop: '24px'
-  }}>
-    <button
-      type="button"
-      onClick={() => setOnboardingStep(6)}
-      className="btn-secondary"
-      style={{
-        padding: '12px 24px',
-        fontWeight: 700
-      }}
-    >
-      <Check size={18} />
-      Save & Return to Profile Summary
-    </button>
-  </div>
-)}
+
 
         {/* STEP 2: Interests */}
         {onboardingStep === 2 && (
@@ -286,12 +278,12 @@ export default function OnboardingView() {
                 <span>Back</span>
               </button>
               <button
-                onClick={() => setOnboardingStep(3)}
+                onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(3)}
                 disabled={userProfile.interests.length < 3}
                 className="btn-primary"
                 style={{ opacity: userProfile.interests.length < 3 ? 0.6 : 1 }}
               >
-                <span>Next: Skills & Strengths</span>
+                <span>{editingSection ? 'Save & Return' : 'Next: Skills & Strengths'}</span>
                 <ArrowRight size={18} />
               </button>
             </div>
@@ -371,7 +363,7 @@ export default function OnboardingView() {
                 onClick={() => setOnboardingStep(4)}
                 className="btn-primary"
               >
-                <span>Next: Work Preferences</span>
+                <<span>{editingSection ? 'Save & Return' : 'Next: Work Preferences'}</span>
                 <ArrowRight size={18} />
               </button>
             </div>
@@ -525,17 +517,17 @@ export default function OnboardingView() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button
-                onClick={() => setOnboardingStep(3)}
+                onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(3)}
                 className="btn-secondary"
               >
                 <ArrowLeft size={18} />
                 <span>Back</span>
               </button>
               <button
-                onClick={() => setOnboardingStep(5)}
+                onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(5)}
                 className="btn-primary"
               >
-                <span>Next: Goals & Values</span>
+                <span>{editingSection ? 'Save & Return' : 'Next: Goals & Values'}</span>
                 <ArrowRight size={18} />
               </button>
             </div>
@@ -597,18 +589,18 @@ export default function OnboardingView() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button
-                onClick={() => setOnboardingStep(4)}
+                onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(4)}
                 className="btn-secondary"
               >
                 <ArrowLeft size={18} />
                 <span>Back</span>
               </button>
               <button
-                onClick={() => setOnboardingStep(6)}
+                onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(6)}
                 disabled={userProfile.goals.length === 0}
                 className="btn-primary"
               >
-                <span>Review Profile</span>
+                <span>{editingSection ? 'Save & Return' : 'Review Profile'}</span>
                 <ArrowRight size={18} />
               </button>
             </div>
@@ -675,7 +667,7 @@ export default function OnboardingView() {
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--dark-slate)' }}>
                     Curiosity Areas ({userProfile.interests.length})
                   </h3>
-                  <button onClick={() => setOnboardingStep(2)} className="btn-ghost" style={{ fontSize: '0.85rem' }}>
+                  <button onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(2)} className="btn-ghost" style={{ fontSize: '0.85rem' }}>
                     <Edit2 size={14} /> Edit
                   </button>
                 </div>
