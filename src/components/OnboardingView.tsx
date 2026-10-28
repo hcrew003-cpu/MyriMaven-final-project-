@@ -270,15 +270,17 @@ export default function OnboardingView() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {!editingSection && (
+                <button
+                  onClick={() => setOnboardingStep(1)}
+                  className="btn-secondary"
+                >
+                  <ArrowLeft size={18} />
+                  <span>Back</span>
+                </button>
+              )}
               <button
-                onClick={() => setOnboardingStep(1)}
-                className="btn-secondary"
-              >
-                <ArrowLeft size={18} />
-                <span>Back</span>
-              </button>
-              <button
-                onClick={() => setOnboardingStep(3)}
+                onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(3)}
                 disabled={userProfile.interests.length < 3}
                 className="btn-primary"
                 style={{ opacity: userProfile.interests.length < 3 ? 0.6 : 1 }}
@@ -352,15 +354,17 @@ export default function OnboardingView() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {!editingSection && (
+                <button
+                  onClick={() => setOnboardingStep(2)}
+                  className="btn-secondary"
+                >
+                  <ArrowLeft size={18} />
+                  <span>Back</span>
+                </button>
+              )}
               <button
-                onClick={() => setOnboardingStep(2)}
-                className="btn-secondary"
-              >
-                <ArrowLeft size={18} />
-                <span>Back</span>
-              </button>
-              <button
-                onClick={() => setOnboardingStep(4)}
+                onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(4)}
                 className="btn-primary"
               >
                 <span>{editingSection ? 'Save & Return' : 'Next: Work Preferences'}</span>
@@ -516,13 +520,15 @@ export default function OnboardingView() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button
-                onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(3)}
-                className="btn-secondary"
-              >
-                <ArrowLeft size={18} />
-                <span>Back</span>
-              </button>
+              {!editingSection && (
+                <button
+                  onClick={() => setOnboardingStep(3)}
+                  className="btn-secondary"
+                >
+                  <ArrowLeft size={18} />
+                  <span>Back</span>
+                </button>
+              )}
               <button
                 onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(5)}
                 className="btn-primary"
@@ -588,13 +594,15 @@ export default function OnboardingView() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button
-                onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(4)}
-                className="btn-secondary"
-              >
-                <ArrowLeft size={18} />
-                <span>Back</span>
-              </button>
+              {!editingSection && (
+                <button
+                  onClick={() => setOnboardingStep(4)}
+                  className="btn-secondary"
+                >
+                  <ArrowLeft size={18} />
+                  <span>Back</span>
+                </button>
+              )}
               <button
                 onClick={() => editingSection ? saveAndReturn() : setOnboardingStep(6)}
                 disabled={userProfile.goals.length === 0}
