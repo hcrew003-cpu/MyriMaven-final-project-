@@ -39,7 +39,7 @@ export default function LandingView() {
             marginBottom: '24px'
           }}>
             <Sparkles size={16} />
-            <span>Introducing MyriMaven AI Career Sandbox</span>
+            <span>Introducing Career Sandbox</span>
           </div>
 
           <h1 style={{
@@ -61,7 +61,7 @@ export default function LandingView() {
             maxWidth: '720px',
             margin: '0 auto 36px'
           }}>
-            MyriMaven is a career exploration sandbox that matches your strengths and interests to real-world roles — without forcing you into a box.
+            Career Sandbox helps you explore career possibilities based on your interests, strengths, and preferences — without forcing you into a box.
           </p>
 
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
