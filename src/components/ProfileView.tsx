@@ -4,7 +4,12 @@
 import { useCareer } from '../context/CareerContext';
 
 export default function ProfileView() {
-  const { authUser, userProfile, setActiveView } = useCareer();
+  const {
+    authUser,
+    userProfile,
+    setActiveView,
+    setOnboardingStep,
+  } = useCareer();
 
   if (!authUser) {
     return (
@@ -17,6 +22,11 @@ export default function ProfileView() {
       </section>
     );
   }
+
+  const handleEditProfile = () => {
+    setOnboardingStep(6);
+    setActiveView('onboarding');
+  };
 
   return (
     <section style={{ maxWidth: 900, margin: '50px auto', padding: 24 }}>
@@ -50,13 +60,47 @@ export default function ProfileView() {
         }}
       >
         <h2>My Career Exploration</h2>
+
         <p>
-          Your interests, strengths, skills, and career preferences
-          will appear here once we connect your onboarding information
-          to your account.
+          <strong>Career Stage:</strong>{' '}
+          {userProfile.careerStage}
         </p>
 
-        <button onClick={() => setActiveView('onboarding')}>
+        <p>
+          <strong>Interests:</strong>{' '}
+          {userProfile.interests.length > 0
+            ? userProfile.interests.join(', ')
+            : 'Not selected yet'}
+        </p>
+
+        <p>
+          <strong>Skills:</strong>{' '}
+          {Object.entries(userProfile.skills)
+            .filter(([, level]) => level > 0)
+            .map(([skill]) => skill)
+            .join(', ') || 'Not selected yet'}
+        </p>
+
+        <p>
+          <strong>Goals:</strong>{' '}
+          {userProfile.goals.length > 0
+            ? userProfile.goals.join(', ')
+            : 'Not selected yet'}
+        </p>
+
+        <button
+          onClick={handleEditProfile}
+          style={{
+            marginTop: 20,
+            padding: '12px 20px',
+            backgroundColor: 'var(--primary)',
+            color: 'white',
+            border: 'none',
+            borderRadius: 10,
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
           Edit My Career Preferences
         </button>
       </div>
