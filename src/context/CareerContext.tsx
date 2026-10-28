@@ -5,7 +5,7 @@ import { Career, UserProfile, WhatIfState, ViewType } from '../types/career';
 import { CAREERS, INITIAL_USER_PROFILE } from '../data/careersData';
 import type { User } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../lib/supabase';
-
+import { loadUserProfile, saveUserProfile } from '../lib/profile';
 interface CareerContextType {
   activeView: ViewType;
   authUser: User | null;
