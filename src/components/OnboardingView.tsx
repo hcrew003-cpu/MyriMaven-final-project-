@@ -618,6 +618,35 @@ export default function OnboardingView() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px', marginBottom: '40px' }}>
+            
+{/* Career Stage Card */}
+<div className="card">
+  <div style={{
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '14px'
+  }}>
+    <h3 style={{
+      fontSize: '1.1rem',
+      fontWeight: 700,
+      color: 'var(--dark-slate)'
+    }}>
+      Your Career Stage
+    </h3>
+    <button
+      onClick={() => setOnboardingStep(1)}
+      className="btn-ghost"
+      style={{ fontSize: '0.85rem' }}
+    >
+      <Edit2 size={14} /> Edit
+    </button>
+  </div>
+  <p style={{ color: 'var(--text-muted)' }}>
+    {userProfile.careerStage}
+  </p>
+</div>
+
               {/* Interests Card */}
               <div className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
