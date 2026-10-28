@@ -206,6 +206,28 @@ export default function OnboardingView() {
           </div>
         )}
 
+{/* Return to Summary when editing a section */}
+{onboardingStep >= 1 && onboardingStep <= 5 && (
+  <div style={{
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '24px'
+  }}>
+    <button
+      type="button"
+      onClick={() => setOnboardingStep(6)}
+      className="btn-secondary"
+      style={{
+        padding: '12px 24px',
+        fontWeight: 700
+      }}
+    >
+      <Check size={18} />
+      Save & Return to Profile Summary
+    </button>
+  </div>
+)}
+
         {/* STEP 2: Interests */}
         {onboardingStep === 2 && (
           <div>
