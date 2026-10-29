@@ -499,7 +499,10 @@ const openOnetCareer = async (code: string) => {
 
                    
 <button
-  onClick={() => openOnetCareer(career.id)}
+  onClick={() => {
+  setSelectedCareerId(career.id);
+  setActiveView('detail');
+}}
   className="btn-primary btn-sm"
   style={{ marginTop: '20px' }}
 >
