@@ -26,27 +26,6 @@ export const INITIAL_USER_PROFILE: UserProfile = {
   goals: [],
 };
 
-  skills: {
-    'Communication': 5,
-    'Leadership': 4,
-    'Organization': 5,
-    'Creativity': 4,
-    'Problem Solving': 3,
-    'Research': 2,
-    'Teamwork': 3,
-    'Analytical Thinking': 3,
-  },
-  preferences: {
-    soloVsTeam: 72, // Leans team
-    structuredVsFlexible: 68, // Leans flexible
-    officeVsRemote: 45, // Hybrid curious
-    peopleVsTask: 48, // Balanced
-    creativeVsAnalytical: 32, // Leans creative
-    fastVsPredictable: 28, // Leans fast-paced
-  },
-  goals: ['Growth', 'Leadership', 'Work-life balance'],
-};
-
 export const ALL_INTERESTS = [
   { id: 'tech', label: 'Technology', desc: 'Apps, AI & building', icon: 'Cpu' },
   { id: 'business', label: 'Business', desc: 'Startups & strategy', icon: 'Briefcase' },
