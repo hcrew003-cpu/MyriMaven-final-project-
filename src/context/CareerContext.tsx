@@ -9,6 +9,20 @@ import { loadUserProfile, saveUserProfile } from '../lib/profile';
 import { loadSavedCareers, addSavedCareer, removeSavedCareer } from '../lib/savedCareers';
 import { loadComparedCareers, addComparedCareer, removeComparedCareer } from '../lib/comparedCareers';
 
+// O*NET occupation details returned by /api/onet/occupation.
+export interface OnetCareer {
+  id: string;
+  title: string;
+  description: string;
+  tasks: { task?: { id: string; title: string }[] } | null;
+  skills: { element?: { id: string; name: string; description: string }[] } | null;
+  knowledge: { element?: { id: string; name: string; description: string }[] } | null;
+  education: {
+    response?: { code: number; title: string; percentage_of_respondents: number }[];
+  } | null;
+  relatedOccupations: { occupation?: { code: string; title: string }[] } | null;
+}
+
 type PreferenceKey = keyof UserProfile['preferences'];
 type RankedCareer = Career & { dynamicScore: number; delta: number; scenarioNote: string };
 
@@ -19,7 +33,10 @@ interface CareerContextType {
   setActiveView: (view: ViewType) => void;
   selectedCareerId: string;
   setSelectedCareerId: (id: string) => void;
-  selectedCareer: Career;
+  selectedCareer: Career; // Legacy prototype career; used by existing views.
+  selectedOnetCareer: OnetCareer | null;
+  onetCareerLoading: boolean;
+  onetCareerError: string;
   savedCareerIds: string[];
   toggleSaveCareer: (id: string) => void;
   isSaved: (id: string) => boolean;
@@ -228,6 +245,47 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
   }, [setActiveView]);
 
   const [selectedCareerId, setSelectedCareerId] = useState('marketing-manager');
+  const [selectedOnetCareer, setSelectedOnetCareer] = useState<OnetCareer | null>(null);
+  const [onetCareerLoading, setOnetCareerLoading] = useState(false);
+  const [onetCareerError, setOnetCareerError] = useState('');
+
+  // Load an O*NET occupation when its official code is selected.
+  // Keep the legacy selectedCareer unchanged until the detail and other views
+  // are migrated, so current Recommendations/Save/Compare/What-If still work.
+  useEffect(() => {
+    const controller = new AbortController();
+    if (!/^\d{2}-\d{4}\.\d{2}$/.test(selectedCareerId)) {
+      setSelectedOnetCareer(null);
+      setOnetCareerLoading(false);
+      setOnetCareerError('');
+      return () => controller.abort();
+    }
+
+    setSelectedOnetCareer(null);
+    setOnetCareerLoading(true);
+    setOnetCareerError('');
+
+    fetch(`/api/onet/occupation?code=${encodeURIComponent(selectedCareerId)}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Unable to load O*NET occupation.');
+        return (await response.json()) as OnetCareer;
+      })
+      .then((occupation) => {
+        if (!controller.signal.aborted) setSelectedOnetCareer(occupation);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setOnetCareerError('Career details are temporarily unavailable.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setOnetCareerLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [selectedCareerId]);
   const [savedCareerIds, setSavedCareerIds] = useState<string[]>([]);
   const [compareCareerIds, setCompareCareerIds] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
@@ -352,6 +410,7 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
     <CareerContext.Provider value={{
       authUser, authLoading, activeView, setActiveView,
       selectedCareerId, setSelectedCareerId, selectedCareer,
+       selectedOnetCareer, onetCareerLoading, onetCareerError,
       savedCareerIds, toggleSaveCareer, isSaved,
       compareCareerIds, toggleCompareCareer, isComparing,
       userProfile, updateUserProfile, saveProfile,
