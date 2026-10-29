@@ -11,6 +11,7 @@ import {
   addSavedCareer,
   removeSavedCareer,
 } from '../lib/savedCareers';
+import { loadComparedCareers } from '../lib/comparedCareers';
 interface CareerContextType {
   activeView: ViewType;
   authUser: User | null;
@@ -132,9 +133,33 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
     cancelled = true;
   };
 }, [authUser?.id]);
-  const [compareCareerIds, setCompareCareerIds] = useState<string[]>([
-    'marketing-manager', 'product-designer', 'project-manager',
-  ]);
+  const [compareCareerIds, setCompareCareerIds] = useState<string[]>([]);
+  useEffect(() => {
+  let cancelled = false;
+
+  // Clear comparisons when signing out or switching accounts.
+  setCompareCareerIds([]);
+
+  if (!authUser) {
+    return;
+  }
+
+  loadComparedCareers(authUser)
+    .then((careerIds) => {
+      if (!cancelled) {
+        setCompareCareerIds(careerIds.slice(0, 3));
+      }
+    })
+    .catch((error) => {
+      if (!cancelled) {
+        console.error('Failed to load compared careers:', error);
+      }
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, [authUser?.id]);
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
   const [profileLoading, setProfileLoading] = useState(false);
 
