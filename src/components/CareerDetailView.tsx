@@ -4,6 +4,8 @@
 import React from 'react';
 import { useCareer } from '../context/CareerContext';
 import type { OnetCareer } from '../context/CareerContext';
+import type { UserProfile } from '../types/career';
+import { calculateOnetMatch } from '../lib/onetMatching';
 import { CAREERS } from '../data/careersData';
 import {
   ArrowLeft,
@@ -46,15 +48,18 @@ const iconLookup: Record<string, React.ReactNode> = {
 // Existing prototype profiles remain available during migration.
 function OnetCareerDetail({
   career,
+  profile,
   onBack,
   onRelated,
   onAskMaya,
 }: {
   career: OnetCareer;
+  profile: UserProfile;
   onBack: () => void;
   onRelated: (id: string) => void;
   onAskMaya: (prompt: string) => void;
 }) {
+  const match = calculateOnetMatch(career, profile);
   const sectionTitle: React.CSSProperties = {
     fontSize: '1.25rem',
     fontWeight: 800,
@@ -109,16 +114,29 @@ function OnetCareerDetail({
             {career.description}
           </p>
 
-          <p
-            style={{
-              marginTop: '14px',
-              fontSize: '0.85rem',
-              color: 'var(--text-muted)',
-            }}
-          >
-            O*NET code: {career.id} · Personalized match
-            score coming soon
-          </p>
+                   <div style={{ marginTop: '20px' }}>
+            <div
+              className={`match-badge ${
+                match.score >= 80 ? 'match-high' : 'match-med'
+              }`}
+              style={{
+                display: 'inline-block',
+                padding: '10px 18px',
+              }}
+            >
+              {match.score}% Estimated Match for You
+            </div>
+
+            <p
+              style={{
+                marginTop: '10px',
+                fontSize: '0.85rem',
+                color: 'var(--text-muted)',
+              }}
+            >
+              O*NET code: {career.id} · Evidence coverage: {match.confidence}
+            </p>
+          </div>
         </div>
 
         <div
@@ -136,6 +154,64 @@ function OnetCareerDetail({
               gap: '24px',
             }}
           >
+                       <section className="card">
+              <h2 style={sectionTitle}>Why This May Fit You</h2>
+
+              {match.reasons.length > 0 ? (
+                <ul style={{ paddingLeft: '20px' }}>
+                  {match.reasons.map((reason, index) => (
+                    <li key={index} style={items}>
+                      {reason}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={items}>
+                  Not enough matching evidence yet.
+                  Try updating your onboarding profile.
+                </p>
+              )}
+
+              <h3 style={{ marginTop: '20px', marginBottom: '12px' }}>
+                What to Consider
+              </h3>
+
+              {match.considerations.length > 0 ? (
+                <ul style={{ paddingLeft: '20px' }}>
+                  {match.considerations.map((item, index) => (
+                    <li key={index} style={items}>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={items}>
+                  No additional considerations identified from the available data.
+                </p>
+              )}
+
+              {match.skillsToDevelop.length > 0 && (
+                <>
+                  <h3 style={{ marginTop: '20px', marginBottom: '12px' }}>
+                    Skills to Develop
+                  </h3>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                    }}
+                  >
+                    {match.skillsToDevelop.map((skill) => (
+                      <span key={skill} className="badge-tag">
+                        + {skill}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+            </section>
             <section className="card">
               <h2 style={sectionTitle}>
                 Typical Responsibilities
@@ -312,7 +388,7 @@ function OnetCareerDetail({
           and Training Administration. U.S. occupational
           information and education pathways may differ
           from Canadian requirements. Saving, comparing,
-          and personalized matching for O*NET occupations
+          for O*NET occupations
           will be added in a later update.
         </p>
       </div>
@@ -322,6 +398,7 @@ function OnetCareerDetail({
 
 export default function CareerDetailView() {
   const {
+    userProfile,
     selectedCareer,
     selectedCareerId,
     selectedOnetCareer,
@@ -383,6 +460,7 @@ export default function CareerDetailView() {
     return (
       <OnetCareerDetail
         career={selectedOnetCareer}
+        profile={userProfile}
         onBack={() => setActiveView('explore')}
         onRelated={setSelectedCareerId}
         onAskMaya={openMayaWithPrompt}
