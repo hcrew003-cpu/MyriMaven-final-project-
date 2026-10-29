@@ -826,9 +826,12 @@ const handleGenerateRecommendations = async () => {
     <span>
       {isSaving ? 'Saving Your Profile...' : 'Generate My Recommendations'}
     </span>
-    {!isSaving && <ArrowRight size={20} />}
+        {!isSaving && <ArrowRight size={20} />}
   </button>
 </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
