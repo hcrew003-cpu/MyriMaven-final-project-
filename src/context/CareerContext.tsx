@@ -11,7 +11,11 @@ import {
   addSavedCareer,
   removeSavedCareer,
 } from '../lib/savedCareers';
-import { loadComparedCareers } from '../lib/comparedCareers';
+import {
+  loadComparedCareers,
+  addComparedCareer,
+  removeComparedCareer,
+} from '../lib/comparedCareers';
 interface CareerContextType {
   activeView: ViewType;
   authUser: User | null;
@@ -246,18 +250,44 @@ useEffect(() => {
 };
   const isSaved = (id: string) => savedCareerIds.includes(id);
 
-  const toggleCompareCareer = (id: string) => {
-    setCompareCareerIds((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((item) => item !== id);
-      } else {
-        if (prev.length >= 3) {
-          return [prev[0], prev[1], id];
-        }
-        return [...prev, id];
+  const toggleCompareCareer = async (id: string) => {
+  if (!authUser) {
+    alert('Please sign in to compare careers.');
+    setActiveView('auth');
+    return;
+  }
+
+  const wasComparing = compareCareerIds.includes(id);
+
+  try {
+    if (wasComparing) {
+      await removeComparedCareer(authUser, id);
+
+      setCompareCareerIds((prev) =>
+        prev.filter((careerId) => careerId !== id)
+      );
+    } else {
+      if (compareCareerIds.length >= 3) {
+        alert('You can compare up to 3 careers. Remove one first.');
+        return;
       }
-    });
-  };
+
+      await addComparedCareer(authUser, id);
+
+      setCompareCareerIds((prev) =>
+        prev.includes(id) ? prev : [...prev, id]
+      );
+    }
+  } catch (error) {
+    console.error('Failed to update compared careers:', error);
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : 'Could not update your comparisons. Please try again.'
+    );
+  }
+};
   const isComparing = (id: string) => compareCareerIds.includes(id);
 
   const updateUserProfile = (updates: Partial<UserProfile>) => {
