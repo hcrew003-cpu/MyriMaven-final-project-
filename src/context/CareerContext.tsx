@@ -6,6 +6,7 @@ import { CAREERS, INITIAL_USER_PROFILE } from '../data/careersData';
 import type { User } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../lib/supabase';
 import { loadUserProfile, saveUserProfile } from '../lib/profile';
+import { loadSavedCareers } from '../lib/savedCareers';
 interface CareerContextType {
   activeView: ViewType;
   authUser: User | null;
@@ -101,6 +102,32 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
 
   const [selectedCareerId, setSelectedCareerId] = useState<string>('marketing-manager');
  const [savedCareerIds, setSavedCareerIds] = useState<string[]>([]);
+  useEffect(() => {
+  let cancelled = false;
+
+  // Clear saved careers when signing out or switching accounts.
+  setSavedCareerIds([]);
+
+  if (!authUser) {
+    return;
+  }
+
+  loadSavedCareers(authUser)
+    .then((careerIds) => {
+      if (!cancelled) {
+        setSavedCareerIds(careerIds);
+      }
+    })
+    .catch((error) => {
+      if (!cancelled) {
+        console.error('Failed to load saved careers:', error);
+      }
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, [authUser?.id]);
   const [compareCareerIds, setCompareCareerIds] = useState<string[]>([
     'marketing-manager', 'product-designer', 'project-manager',
   ]);
