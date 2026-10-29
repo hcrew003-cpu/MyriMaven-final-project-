@@ -6,7 +6,11 @@ import { CAREERS, INITIAL_USER_PROFILE } from '../data/careersData';
 import type { User } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../lib/supabase';
 import { loadUserProfile, saveUserProfile } from '../lib/profile';
-import { loadSavedCareers } from '../lib/savedCareers';
+import {
+  loadSavedCareers,
+  addSavedCareer,
+  removeSavedCareer,
+} from '../lib/savedCareers';
 interface CareerContextType {
   activeView: ViewType;
   authUser: User | null;
@@ -185,11 +189,36 @@ useEffect(() => {
   const selectedCareer =
     CAREERS.find((c) => c.id === selectedCareerId) || CAREERS[0];
 
-  const toggleSaveCareer = (id: string) => {
-    setSavedCareerIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+  const toggleSaveCareer = async (id: string) => {
+  if (!authUser) {
+    alert('Please sign in to save careers.');
+    setActiveView('auth');
+    return;
+  }
+
+  const wasSaved = savedCareerIds.includes(id);
+
+  try {
+    if (wasSaved) {
+      await removeSavedCareer(authUser, id);
+      setSavedCareerIds((prev) =>
+        prev.filter((careerId) => careerId !== id)
+      );
+    } else {
+      await addSavedCareer(authUser, id);
+      setSavedCareerIds((prev) =>
+        prev.includes(id) ? prev : [...prev, id]
+      );
+    }
+  } catch (error) {
+    console.error('Failed to update saved career:', error);
+    alert(
+      error instanceof Error
+        ? error.message
+        : 'Could not update your saved careers. Please try again.'
     );
-  };
+  }
+};
   const isSaved = (id: string) => savedCareerIds.includes(id);
 
   const toggleCompareCareer = (id: string) => {
