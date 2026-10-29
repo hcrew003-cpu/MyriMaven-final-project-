@@ -100,9 +100,7 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
   }, [setActiveView]);
 
   const [selectedCareerId, setSelectedCareerId] = useState<string>('marketing-manager');
-  const [savedCareerIds, setSavedCareerIds] = useState<string[]>([
-    'marketing-manager', 'product-designer', 'project-manager',
-  ]);
+ const [savedCareerIds, setSavedCareerIds] = useState<string[]>([]);
   const [compareCareerIds, setCompareCareerIds] = useState<string[]>([
     'marketing-manager', 'product-designer', 'project-manager',
   ]);
