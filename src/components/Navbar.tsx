@@ -14,13 +14,14 @@ import {
 import { getSupabaseClient } from '../lib/supabase';
 
 export default function Navbar() {
-  const {
-    setActiveView,
-    savedCareerIds,
-    setIsMayaOpen,
-    authUser,
-    authLoading,
-  } = useCareer();
+ const {
+  activeView,
+  setActiveView,
+  savedCareerIds,
+  setIsMayaOpen,
+  authUser,
+  authLoading,
+} = useCareer();
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
@@ -54,51 +55,40 @@ export default function Navbar() {
         </button>
 
         {/* Navigation for logged-in users */}
-        {!authLoading && authUser && (
-          <div className="nav-links">
-            <button
-              onClick={() => setActiveView('explore')}
-              className="nav-link-btn"
-            >
-              Explore
-            </button>
+{!authLoading && authUser && (
+  <div className="nav-links">
+    {([
+      { view: 'explore', label: 'Explore', icon: null },
+      { view: 'recommendations', label: 'Recommendations', icon: null },
+      { view: 'what-if', label: 'What-If Sandbox', icon: <Sliders size={14} /> },
+      { view: 'saved', label: `Saved (${savedCareerIds.length})`, icon: <Bookmark size={14} /> },
+      { view: 'compare', label: 'Compare', icon: <BarChart3 size={14} /> },
+      { view: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={14} /> },
+    ] as const).map((item) => {
+      const isActive = activeView === item.view;
 
-            <button
-              onClick={() => setActiveView('recommendations')}
-              className="nav-link-btn"
-            >
-              Recommendations
-            </button>
-
-            <button
-              onClick={() => setActiveView('what-if')}
-              className="nav-link-btn"
-            >
-              <Sliders size={14} /> What-If Sandbox
-            </button>
-
-            <button
-              onClick={() => setActiveView('saved')}
-              className="nav-link-btn"
-            >
-              <Bookmark size={14} /> Saved ({savedCareerIds.length})
-            </button>
-
-            <button
-              onClick={() => setActiveView('compare')}
-              className="nav-link-btn"
-            >
-              <BarChart3 size={14} /> Compare
-            </button>
-
-            <button
-              onClick={() => setActiveView('dashboard')}
-              className="nav-link-btn"
-            >
-              <LayoutDashboard size={14} /> Dashboard
-            </button>
-          </div>
-        )}
+      return (
+        <button
+          key={item.view}
+          onClick={() => setActiveView(item.view)}
+          className="nav-link-btn"
+          aria-current={isActive ? 'page' : undefined}
+          style={{
+            backgroundColor: isActive ? 'rgba(12, 105, 87, 0.12)' : 'transparent',
+            color: isActive ? '#0c6957' : undefined,
+            fontWeight: isActive ? 700 : undefined,
+            borderRadius: '10px',
+            padding: '10px 14px',
+            transition: 'background-color 0.2s ease',
+          }}
+        >
+          {item.icon}
+          {item.label}
+        </button>
+      );
+    })}
+  </div>
+)}
 
         {/* Right-side account controls */}
         <div className="nav-actions">
