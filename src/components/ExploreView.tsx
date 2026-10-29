@@ -4,7 +4,30 @@ import React, { useEffect, useState } from 'react';
 import { useCareer } from '../context/CareerContext';
 import { CAREERS } from '../data/careersData';
 import { Search, Filter, Bookmark, BarChart3, ChevronRight } from 'lucide-react';
-
+type OnetOccupation = {
+  id: string;
+  title: string;
+  description: string;
+  tasks: {
+    task?: { id: string; title: string }[];
+  } | null;
+  skills: {
+    element?: { id: string; name: string; description: string }[];
+  } | null;
+  knowledge: {
+    element?: { id: string; name: string; description: string }[];
+  } | null;
+  education: {
+    response?: {
+      code: number;
+      title: string;
+      percentage_of_respondents: number;
+    }[];
+  } | null;
+  relatedOccupations: {
+    occupation?: { code: string; title: string }[];
+  } | null;
+};
 export default function ExploreView() {
   const {
     setSelectedCareerId,
@@ -25,6 +48,16 @@ export default function ExploreView() {
   const [onetTotal, setOnetTotal] = useState(0);
   const [onetLoading, setOnetLoading] = useState(false);
   const [onetError, setOnetError] = useState('');
+  
+const [selectedOnetCareer, setSelectedOnetCareer] =
+  useState<OnetOccupation | null>(null);
+
+const [onetDetailLoading, setOnetDetailLoading] =
+  useState(false);
+
+const [onetDetailError, setOnetDetailError] =
+  useState('');
+
 
   useEffect(() => {
     const keyword = searchTerm.trim();
@@ -77,6 +110,31 @@ export default function ExploreView() {
       controller.abort();
     };
   }, [searchTerm]);
+
+const openOnetCareer = async (code: string) => {
+  setOnetDetailLoading(true);
+  setOnetDetailError('');
+  setSelectedOnetCareer(null);
+
+  try {
+    const response = await fetch(
+      `/api/onet/occupation?code=${encodeURIComponent(code)}`
+    );
+
+    if (!response.ok) {
+      throw new Error('Unable to load career details.');
+    }
+
+    const data: OnetOccupation = await response.json();
+    setSelectedOnetCareer(data);
+  } catch {
+    setOnetDetailError(
+      'Career details are temporarily unavailable.'
+    );
+  } finally {
+    setOnetDetailLoading(false);
+  }
+};
 
 
   const filteredCareers = CAREERS.filter((c) => {
@@ -259,6 +317,103 @@ export default function ExploreView() {
           })}
         </div>
         
+{(onetDetailLoading || onetDetailError || selectedOnetCareer) && (
+  <section
+    className="card"
+    style={{ padding: '28px', marginTop: '32px' }}
+  >
+    {onetDetailLoading && <p>Loading career profile...</p>}
+
+    {onetDetailError && (
+      <p role="alert">{onetDetailError}</p>
+    )}
+
+    {selectedOnetCareer && (
+      <div>
+        <button
+          onClick={() => setSelectedOnetCareer(null)}
+          className="btn-secondary btn-sm"
+          style={{ marginBottom: '20px' }}
+        >
+          Close Profile
+        </button>
+
+        <h2 style={{ fontSize: '1.8rem', marginBottom: '12px' }}>
+          {selectedOnetCareer.title}
+        </h2>
+
+        <p style={{ lineHeight: 1.7, marginBottom: '24px' }}>
+          {selectedOnetCareer.description}
+        </p>
+
+        <h3 style={{ marginBottom: '12px' }}>
+          Typical Responsibilities
+        </h3>
+        <ul style={{ paddingLeft: '24px', marginBottom: '24px' }}>
+          {(selectedOnetCareer.tasks?.task ?? []).map((task) => (
+            <li key={task.id} style={{ marginBottom: '8px' }}>
+              {task.title}
+            </li>
+          ))}
+        </ul>
+
+        <h3 style={{ marginBottom: '12px' }}>
+          Key Skills
+        </h3>
+        <ul style={{ paddingLeft: '24px', marginBottom: '24px' }}>
+          {(selectedOnetCareer.skills?.element ?? []).map((skill) => (
+            <li key={skill.id} style={{ marginBottom: '8px' }}>
+              <strong>{skill.name}:</strong> {skill.description}
+            </li>
+          ))}
+        </ul>
+
+        <h3 style={{ marginBottom: '12px' }}>
+          Education Backgrounds
+        </h3>
+        <ul style={{ paddingLeft: '24px', marginBottom: '24px' }}>
+          {(selectedOnetCareer.education?.response ?? []).map(
+            (education) => (
+              <li key={education.code} style={{ marginBottom: '8px' }}>
+                {education.title} — {education.percentage_of_respondents}%
+                of respondents
+              </li>
+            )
+          )}
+        </ul>
+
+        <h3 style={{ marginTop: '24px', marginBottom: '12px' }}>
+          Related Careers
+        </h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {(selectedOnetCareer.relatedOccupations?.occupation ?? []).map(
+            (related) => (
+              <button
+                key={related.code}
+                onClick={() => openOnetCareer(related.code)}
+                className="btn-secondary btn-sm"
+              >
+                {related.title}
+              </button>
+            )
+          )}
+        </div>
+
+        <p
+          style={{
+            marginTop: '24px',
+            fontSize: '0.8rem',
+            color: 'var(--text-muted)'
+          }}
+        >
+          Source: O*NET Web Services. U.S. occupational information
+          may differ from Canadian requirements.
+        </p>
+      </div>
+    )}
+  </section>
+)}
+
         {/* O*NET Career Discovery */}
         <section style={{ marginTop: '48px' }}>
           <div style={{ marginBottom: '20px' }}>
@@ -342,16 +497,16 @@ export default function ExploreView() {
                       </p>
                     </div>
 
-                    <p
-                      style={{
-                        marginTop: '20px',
-                        color: 'var(--text-muted)',
-                        fontSize: '0.85rem'
-                      }}
-                    >
-                      Detailed profiles, saving, and comparing
-                      for these occupations are coming next.
-                    </p>
+                   
+<button
+  onClick={() => openOnetCareer(career.id)}
+  className="btn-primary btn-sm"
+  style={{ marginTop: '20px' }}
+>
+  <span>View Profile</span>
+  <ChevronRight size={14} />
+</button>
+
                   </div>
                 ))}
               </div>
