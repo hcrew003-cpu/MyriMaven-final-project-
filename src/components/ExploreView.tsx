@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCareer } from '../context/CareerContext';
 import { CAREERS } from '../data/careersData';
 import { Search, Filter, Bookmark, BarChart3, ChevronRight } from 'lucide-react';
@@ -18,6 +18,66 @@ export default function ExploreView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedEducation, setSelectedEducation] = useState('All');
+  
+  const [onetCareers, setOnetCareers] = useState<
+    { id: string; title: string }[]
+  >([]);
+  const [onetTotal, setOnetTotal] = useState(0);
+  const [onetLoading, setOnetLoading] = useState(false);
+  const [onetError, setOnetError] = useState('');
+
+  useEffect(() => {
+    const keyword = searchTerm.trim();
+
+    if (keyword.length < 2) {
+      setOnetCareers([]);
+      setOnetTotal(0);
+      setOnetError('');
+      setOnetLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    setOnetLoading(true);
+    setOnetError('');
+    setOnetCareers([]);
+    setOnetTotal(0);
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `/api/onet?keyword=${encodeURIComponent(keyword)}`,
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          throw new Error('Unable to search O*NET careers.');
+        }
+
+        const data = await response.json();
+
+        if (!controller.signal.aborted) {
+          setOnetCareers(data.careers ?? []);
+          setOnetTotal(data.total ?? 0);
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setOnetError('Career search is temporarily unavailable.');
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setOnetLoading(false);
+        }
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchTerm]);
+
 
   const filteredCareers = CAREERS.filter((c) => {
     const matchesSearch =
@@ -44,7 +104,7 @@ export default function ExploreView() {
             Explore Careers Directory
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '1.05rem', maxWidth: '720px' }}>
-            Browse and search all career profiles in the sandbox. Filter by industry, work style, or education level.
+            Explore personalized career profiles or search a much larger directory of occupations powered by O*NET.
           </p>
         </div>
 
@@ -198,6 +258,126 @@ export default function ExploreView() {
             );
           })}
         </div>
+        
+        {/* O*NET Career Discovery */}
+        <section style={{ marginTop: '48px' }}>
+          <div style={{ marginBottom: '20px' }}>
+            <h2
+              style={{
+                fontSize: '1.8rem',
+                fontWeight: 800,
+                color: 'var(--dark-slate)',
+                marginBottom: '8px'
+              }}
+            >
+              Discover More Careers
+            </h2>
+            <p style={{ color: 'var(--text-muted)' }}>
+              Search occupations beyond our featured career profiles.
+              Results are provided by O*NET, a U.S. occupational
+              information resource.
+            </p>
+          </div>
+
+          {searchTerm.trim().length < 2 ? (
+            <div className="card" style={{ padding: '28px' }}>
+              <p style={{ color: 'var(--text-muted)' }}>
+                Type at least two characters in the search bar above
+                to discover additional careers.
+              </p>
+            </div>
+          ) : onetLoading ? (
+            <div className="card" style={{ padding: '28px' }}>
+              Searching the career directory...
+            </div>
+          ) : onetError ? (
+            <div className="card" style={{ padding: '28px' }}>
+              <p role="alert">{onetError}</p>
+            </div>
+          ) : (
+            <>
+              <p
+                style={{
+                  marginBottom: '20px',
+                  color: 'var(--text-muted)'
+                }}
+              >
+                {onetTotal} matching occupations found.
+                Showing {onetCareers.length} results.
+              </p>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns:
+                    'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
+                  gap: '20px'
+                }}
+              >
+                {onetCareers.map((career) => (
+                  <div
+                    key={career.id}
+                    className="career-card"
+                    style={{ padding: '24px' }}
+                  >
+                    <div>
+                      <span className="career-category">
+                        O*NET Occupation
+                      </span>
+
+                      <h3
+                        className="career-title"
+                        style={{ marginTop: '16px' }}
+                      >
+                        {career.title}
+                      </h3>
+
+                      <p
+                        style={{
+                          color: 'var(--text-muted)',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        Occupation code: {career.id}
+                      </p>
+                    </div>
+
+                    <p
+                      style={{
+                        marginTop: '20px',
+                        color: 'var(--text-muted)',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      Detailed profiles, saving, and comparing
+                      for these occupations are coming next.
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {onetCareers.length === 0 && (
+                <div className="card" style={{ padding: '28px' }}>
+                  No matching occupations found. Try another keyword.
+                </div>
+              )}
+            </>
+          )}
+
+          <p
+            style={{
+              marginTop: '24px',
+              fontSize: '0.8rem',
+              color: 'var(--text-muted)'
+            }}
+          >
+            Occupational information from O*NET Web Services,
+            U.S. Department of Labor/Employment and Training
+            Administration. U.S. occupation information may differ
+            from Canadian requirements.
+          </p>
+        </section>
+
       </div>
     </div>
   );
