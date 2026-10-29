@@ -1,7 +1,9 @@
+
 'use client';
 
 import React from 'react';
 import { useCareer } from '../context/CareerContext';
+import type { OnetCareer } from '../context/CareerContext';
 import { CAREERS } from '../data/careersData';
 import {
   ArrowLeft,
@@ -40,9 +42,291 @@ const iconLookup: Record<string, React.ReactNode> = {
   ShieldCheck: <ShieldCheck size={20} />,
 };
 
+// O*NET profiles use occupational data.
+// Existing prototype profiles remain available during migration.
+function OnetCareerDetail({
+  career,
+  onBack,
+  onRelated,
+  onAskMaya,
+}: {
+  career: OnetCareer;
+  onBack: () => void;
+  onRelated: (id: string) => void;
+  onAskMaya: (prompt: string) => void;
+}) {
+  const sectionTitle: React.CSSProperties = {
+    fontSize: '1.25rem',
+    fontWeight: 800,
+    color: 'var(--dark-slate)',
+    marginBottom: '14px',
+  };
+
+  const items: React.CSSProperties = {
+    margin: '0 0 10px',
+    lineHeight: 1.6,
+    color: 'var(--text-muted)',
+  };
+
+  return (
+    <div style={{ padding: '36px 0 80px' }}>
+      <div className="container">
+        <button
+          onClick={onBack}
+          className="btn-ghost"
+          style={{ marginBottom: '24px' }}
+        >
+          <ArrowLeft size={16} />
+          Back to Explore Careers
+        </button>
+
+        <div
+          className="card"
+          style={{ padding: '36px', marginBottom: '28px' }}
+        >
+          <span className="career-category">
+            O*NET Occupation
+          </span>
+
+          <h1
+            style={{
+              fontSize: '2.4rem',
+              fontWeight: 800,
+              color: 'var(--dark-slate)',
+              margin: '8px 0 14px',
+            }}
+          >
+            {career.title}
+          </h1>
+
+          <p
+            style={{
+              color: 'var(--text-muted)',
+              fontSize: '1.05rem',
+              lineHeight: 1.7,
+            }}
+          >
+            {career.description}
+          </p>
+
+          <p
+            style={{
+              marginTop: '14px',
+              fontSize: '0.85rem',
+              color: 'var(--text-muted)',
+            }}
+          >
+            O*NET code: {career.id} · Personalized match
+            score coming soon
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns:
+              'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
+            gap: '24px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px',
+            }}
+          >
+            <section className="card">
+              <h2 style={sectionTitle}>
+                Typical Responsibilities
+              </h2>
+
+              <ul style={{ paddingLeft: '20px' }}>
+                {(career.tasks?.task ?? []).map((task) => (
+                  <li key={task.id} style={items}>
+                    {task.title}
+                  </li>
+                ))}
+              </ul>
+
+              <p
+                style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                Showing the first available tasks from O*NET.
+              </p>
+            </section>
+
+            <section className="card">
+              <h2 style={sectionTitle}>
+                Education Backgrounds
+              </h2>
+
+              <p style={{ ...items, marginBottom: '14px' }}>
+                Education reported by O*NET survey
+                respondents; not a formal entry requirement.
+              </p>
+
+              <ul style={{ paddingLeft: '20px' }}>
+                {(career.education?.response ?? []).map(
+                  (item) => (
+                    <li key={item.code} style={items}>
+                      {item.title} —{' '}
+                      {item.percentage_of_respondents}%
+                      of respondents
+                    </li>
+                  )
+                )}
+              </ul>
+            </section>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px',
+            }}
+          >
+            <section className="card">
+              <h2 style={sectionTitle}>Key Skills</h2>
+
+              <ul style={{ paddingLeft: '20px' }}>
+                {(career.skills?.element ?? []).map(
+                  (skill) => (
+                    <li key={skill.id} style={items}>
+                      <strong>{skill.name}:</strong>{' '}
+                      {skill.description}
+                    </li>
+                  )
+                )}
+              </ul>
+            </section>
+
+            <section className="card">
+              <h2 style={sectionTitle}>Knowledge Areas</h2>
+
+              <ul style={{ paddingLeft: '20px' }}>
+                {(career.knowledge?.element ?? []).map(
+                  (item) => (
+                    <li key={item.id} style={items}>
+                      <strong>{item.name}:</strong>{' '}
+                      {item.description}
+                    </li>
+                  )
+                )}
+              </ul>
+            </section>
+
+            <section
+              className="card"
+              style={{
+                background:
+                  'linear-gradient(135deg, #F8FAF9 0%, #EFF8F5 100%)',
+              }}
+            >
+              <h2 style={sectionTitle}>
+                <Sparkles
+                  size={20}
+                  style={{
+                    display: 'inline',
+                    marginRight: '8px',
+                  }}
+                />
+                Ask Maya
+              </h2>
+
+              <button
+                className="maya-prompt-chip"
+                onClick={() =>
+                  onAskMaya(
+                    `What is a typical workday like for a ${career.title}? Use O*NET occupation code ${career.id} for context.`
+                  )
+                }
+              >
+                What's a typical day like in this career?
+                <ChevronRight size={14} />
+              </button>
+            </section>
+          </div>
+        </div>
+
+        <section style={{ marginTop: '38px' }}>
+          <h2 style={sectionTitle}>
+            Related Careers to Explore
+          </h2>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                'repeat(auto-fit, minmax(min(100%, 270px), 1fr))',
+              gap: '16px',
+            }}
+          >
+            {(career.relatedOccupations?.occupation ?? []).map(
+              (related) => (
+                <button
+                  key={related.code}
+                  className="card card-hover"
+                  onClick={() => {
+                    onRelated(related.code);
+                    window.scrollTo({
+                      top: 0,
+                      behavior: 'smooth',
+                    });
+                  }}
+                  style={{
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    padding: '20px',
+                    color: 'var(--dark-slate)',
+                    fontWeight: 700,
+                  }}
+                >
+                  {related.title}
+                  <ChevronRight
+                    size={16}
+                    style={{
+                      display: 'inline',
+                      verticalAlign: 'middle',
+                    }}
+                  />
+                </button>
+              )
+            )}
+          </div>
+        </section>
+
+        <p
+          style={{
+            marginTop: '32px',
+            color: 'var(--text-muted)',
+            fontSize: '0.8rem',
+          }}
+        >
+          Occupational information from O*NET Web
+          Services, U.S. Department of Labor/Employment
+          and Training Administration. U.S. occupational
+          information and education pathways may differ
+          from Canadian requirements. Saving, comparing,
+          and personalized matching for O*NET occupations
+          will be added in a later update.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function CareerDetailView() {
   const {
     selectedCareer,
+    selectedCareerId,
+    selectedOnetCareer,
+    onetCareerLoading,
+    onetCareerError,
     setSelectedCareerId,
     setActiveView,
     toggleSaveCareer,
@@ -59,234 +343,507 @@ export default function CareerDetailView() {
     selectedCareer.relatedCareerIds.includes(c.id)
   );
 
+  // Show the O*NET detail page for O*NET occupation IDs.
+  if (/^\d{2}-\d{4}\.\d{2}$/.test(selectedCareerId)) {
+    if (
+      onetCareerLoading ||
+      (!selectedOnetCareer && !onetCareerError)
+    ) {
+      return (
+        <div
+          className="container"
+          style={{ padding: '60px 0' }}
+        >
+          Loading O*NET career profile...
+        </div>
+      );
+    }
+
+    if (onetCareerError || !selectedOnetCareer) {
+      return (
+        <div
+          className="container"
+          style={{ padding: '60px 0' }}
+        >
+          <p role="alert">
+            {onetCareerError ||
+              'Unable to load this career.'}
+          </p>
+
+          <button
+            className="btn-secondary btn-sm"
+            onClick={() => setActiveView('explore')}
+          >
+            Back to Explore
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <OnetCareerDetail
+        career={selectedOnetCareer}
+        onBack={() => setActiveView('explore')}
+        onRelated={setSelectedCareerId}
+        onAskMaya={openMayaWithPrompt}
+      />
+    );
+  }
+
+  // Original career profiles are preserved.
   return (
     <div style={{ padding: '36px 0 80px' }}>
       <div className="container">
-        {/* Back navigation */}
         <button
           onClick={() => setActiveView('recommendations')}
           className="btn-ghost"
-          style={{ marginBottom: '24px', fontSize: '0.92rem' }}
+          style={{
+            marginBottom: '24px',
+            fontSize: '0.92rem',
+          }}
         >
           <ArrowLeft size={16} />
           <span>Back to Recommendations</span>
         </button>
 
-        {/* Hero Card */}
-        <div className="card" style={{ padding: '36px', marginBottom: '32px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px' }}>
+        <div
+          className="card"
+          style={{
+            padding: '36px',
+            marginBottom: '32px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              flexWrap: 'wrap',
+              gap: '20px',
+            }}
+          >
             <div>
-              <span className="career-category" style={{ fontSize: '0.85rem' }}>
+              <span className="career-category">
                 {selectedCareer.category}
               </span>
-              <h1 style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--dark-slate)', marginTop: '4px', marginBottom: '8px' }}>
+
+              <h1
+                style={{
+                  fontSize: '2.5rem',
+                  fontWeight: 800,
+                  color: 'var(--dark-slate)',
+                  marginTop: '4px',
+                  marginBottom: '8px',
+                }}
+              >
                 {selectedCareer.title}
               </h1>
-              <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)', maxWidth: '780px', lineHeight: 1.6 }}>
+
+              <p
+                style={{
+                  fontSize: '1.1rem',
+                  color: 'var(--text-muted)',
+                  maxWidth: '780px',
+                  lineHeight: 1.6,
+                }}
+              >
                 {selectedCareer.description}
               </p>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
-              <div className={`match-badge ${selectedCareer.baseMatch >= 90 ? 'match-high' : 'match-med'}`} style={{ fontSize: '1.05rem', padding: '8px 16px' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                gap: '12px',
+              }}
+            >
+              <div
+                className={`match-badge ${
+                  selectedCareer.baseMatch >= 90
+                    ? 'match-high'
+                    : 'match-med'
+                }`}
+              >
                 {selectedCareer.baseMatch}% Match for You
               </div>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '8px',
+                }}
+              >
                 <button
-                  onClick={() => toggleSaveCareer(selectedCareer.id)}
-                  className={`btn-secondary btn-sm ${saved ? 'tag-active' : ''}`}
+                  onClick={() =>
+                    toggleSaveCareer(selectedCareer.id)
+                  }
+                  className={`btn-secondary btn-sm ${
+                    saved ? 'tag-active' : ''
+                  }`}
                 >
-                  <Bookmark size={14} style={{ fill: saved ? 'var(--primary)' : 'none' }} />
-                  <span>{saved ? 'Saved' : 'Save'}</span>
+                  <Bookmark size={14} />
+                  <span>
+                    {saved ? 'Saved' : 'Save'}
+                  </span>
                 </button>
 
                 <button
-                  onClick={() => toggleCompareCareer(selectedCareer.id)}
-                  className={`btn-secondary btn-sm ${comparing ? 'tag-active' : ''}`}
+                  onClick={() =>
+                    toggleCompareCareer(selectedCareer.id)
+                  }
+                  className={`btn-secondary btn-sm ${
+                    comparing ? 'tag-active' : ''
+                  }`}
                 >
                   <BarChart3 size={14} />
-                  <span>{comparing ? 'In Compare' : 'Compare'}</span>
+                  <span>
+                    {comparing ? 'In Compare' : 'Compare'}
+                  </span>
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Main Grid: Left Details & Right Sidebars */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '32px' }}>
-          {/* Left Column: Reasons & Tradeoffs */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {/* Why This May Fit You */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns:
+              'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
+            gap: '32px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '32px',
+            }}
+          >
             <div className="card">
-              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--dark-slate)', marginBottom: '16px' }}>
+              <h2
+                style={{
+                  fontSize: '1.35rem',
+                  fontWeight: 800,
+                  marginBottom: '16px',
+                }}
+              >
                 Why this may fit you
               </h2>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {selectedCareer.matchReasons.map((reason, idx) => (
+              {selectedCareer.matchReasons.map(
+                (reason, idx) => (
                   <div
                     key={idx}
                     style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '14px',
                       padding: '16px',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: 'var(--primary-subtle)',
-                      border: '1px solid var(--primary-border)'
+                      marginBottom: '12px',
+                      backgroundColor:
+                        'var(--primary-subtle)',
+                      borderRadius:
+                        'var(--radius-md)',
+                      display: 'flex',
+                      gap: '14px',
                     }}
                   >
-                    <div style={{
-                      color: 'var(--primary)',
-                      marginTop: '2px'
-                    }}>
-                      {iconLookup[reason.icon] || <CheckCircle2 size={20} />}
+                    <div
+                      style={{
+                        color: 'var(--primary)',
+                      }}
+                    >
+                      {iconLookup[reason.icon] || (
+                        <CheckCircle2 size={20} />
+                      )}
                     </div>
+
                     <div>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--dark-slate)' }}>
+                      <h3
+                        style={{
+                          fontWeight: 700,
+                          marginBottom: '4px',
+                        }}
+                      >
                         {reason.title}
                       </h3>
-                      <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+
+                      <p
+                        style={{
+                          color: 'var(--text-muted)',
+                          fontSize: '0.88rem',
+                        }}
+                      >
                         {reason.description}
                       </p>
                     </div>
                   </div>
-                ))}
-              </div>
+                )
+              )}
             </div>
 
-            {/* Honest Trade-offs */}
-            <div className="card" style={{ borderLeft: '4px solid var(--accent-gold)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                <AlertTriangle size={22} style={{ color: 'var(--accent-gold)' }} />
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#78350F' }}>
-                  What to watch out for (honest trade-offs)
+            <div
+              className="card"
+              style={{
+                borderLeft:
+                  '4px solid var(--accent-gold)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  marginBottom: '12px',
+                }}
+              >
+                <AlertTriangle
+                  size={22}
+                  style={{
+                    color: 'var(--accent-gold)',
+                  }}
+                />
+
+                <h2
+                  style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 800,
+                  }}
+                >
+                  What to watch out for
                 </h2>
               </div>
-              <p style={{ fontSize: '0.98rem', color: '#78350F', lineHeight: 1.6, backgroundColor: '#FFFDF8', padding: '16px', borderRadius: 'var(--radius-md)' }}>
+
+              <p style={{ lineHeight: 1.6 }}>
                 {selectedCareer.watchOut}
               </p>
             </div>
           </div>
 
-          {/* Right Column: Skills Breakdown & Maya Prompts */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {/* Skills & Environment */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '32px',
+            }}
+          >
             <div className="card">
-              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--dark-slate)', marginBottom: '18px' }}>
+              <h2
+                style={{
+                  fontSize: '1.35rem',
+                  fontWeight: 800,
+                  marginBottom: '18px',
+                }}
+              >
                 Day-to-day breakdown
               </h2>
 
-              <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px' }}>
-                  Key skills you'll use
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {selectedCareer.skillsUsed.map((skill, idx) => (
-                    <div key={idx}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', fontWeight: 700, marginBottom: '4px' }}>
-                        <span>{skill.name}</span>
-                        <span style={{ color: 'var(--primary)' }}>{skill.level}%</span>
-                      </div>
-                      <div className="progress-track" style={{ height: '8px' }}>
-                        <div className="progress-fill" style={{ width: `${skill.level}%` }} />
-                      </div>
+              <h3
+                style={{
+                  marginBottom: '12px',
+                  fontWeight: 700,
+                }}
+              >
+                Key skills you'll use
+              </h3>
+
+              {selectedCareer.skillsUsed.map(
+                (skill, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      marginBottom: '12px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent:
+                          'space-between',
+                      }}
+                    >
+                      <strong>{skill.name}</strong>
+                      <span>{skill.level}%</span>
                     </div>
-                  ))}
-                </div>
+
+                    <div className="progress-track">
+                      <div
+                        className="progress-fill"
+                        style={{
+                          width: `${skill.level}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )
+              )}
+
+              <h3
+                style={{
+                  marginTop: '24px',
+                  marginBottom: '12px',
+                  fontWeight: 700,
+                }}
+              >
+                Skills to develop
+              </h3>
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '6px',
+                }}
+              >
+                {selectedCareer.skillsToDevelop.map(
+                  (skill, idx) => (
+                    <span
+                      key={idx}
+                      className="badge-tag"
+                    >
+                      + {skill}
+                    </span>
+                  )
+                )}
               </div>
 
-              <div style={{ marginBottom: '20px' }}>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                  Skills to develop
-                </h3>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {selectedCareer.skillsToDevelop.map((s, idx) => (
-                    <span key={idx} className="badge-tag" style={{ backgroundColor: 'var(--accent-gold-bg)', color: 'var(--accent-gold-text)' }}>
-                      + {s}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              <h3
+                style={{
+                  marginTop: '24px',
+                  marginBottom: '12px',
+                  fontWeight: 700,
+                }}
+              >
+                Work environment
+              </h3>
 
-              <div>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                  Work environment
-                </h3>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {selectedCareer.workEnvironment.map((w, idx) => (
-                    <span key={idx} className="badge-tag">
-                      {w}
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '6px',
+                }}
+              >
+                {selectedCareer.workEnvironment.map(
+                  (environment, idx) => (
+                    <span
+                      key={idx}
+                      className="badge-tag"
+                    >
+                      {environment}
                     </span>
-                  ))}
-                </div>
+                  )
+                )}
               </div>
             </div>
 
-            {/* Maya Prompt Card */}
-            <div className="card" style={{ background: 'linear-gradient(135deg, #F8FAF9 0%, #EFF8F5 100%)', borderColor: 'var(--primary-border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                <div className="avatar-circle">
-                  <Sparkles size={16} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary)' }}>
-                    Ask Maya about {selectedCareer.title}
-                  </h3>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                    Get candid, nuanced answers without sugar-coating
-                  </p>
-                </div>
-              </div>
+            <div
+              className="card"
+              style={{
+                background:
+                  'linear-gradient(135deg, #F8FAF9 0%, #EFF8F5 100%)',
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: '1.1rem',
+                  fontWeight: 700,
+                  color: 'var(--primary)',
+                  marginBottom: '14px',
+                }}
+              >
+                <Sparkles
+                  size={16}
+                  style={{
+                    display: 'inline',
+                    marginRight: '8px',
+                  }}
+                />
+                Ask Maya about {selectedCareer.title}
+              </h3>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '14px' }}>
-                {[
-                  `What's an average Tuesday look like for a ${selectedCareer.title}?`,
-                  `How stressful is this role compared to Product Design?`,
-                  `What does the first 1-2 years look like?`,
-                ].map((prompt, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => openMayaWithPrompt(prompt)}
-                    className="maya-prompt-chip"
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                  >
-                    <span>{prompt}</span>
-                    <Sparkles size={14} />
-                  </button>
-                ))}
-              </div>
+              {[
+                `What's an average Tuesday like for a ${selectedCareer.title}?`,
+                `How stressful is this role?`,
+                `What does the first 1-2 years look like?`,
+              ].map((prompt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() =>
+                    openMayaWithPrompt(prompt)
+                  }
+                  className="maya-prompt-chip"
+                  style={{
+                    display: 'flex',
+                    justifyContent:
+                      'space-between',
+                    marginBottom: '8px',
+                  }}
+                >
+                  {prompt}
+                  <Sparkles size={14} />
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Related Careers */}
         <div style={{ marginTop: '48px' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--dark-slate)', marginBottom: '16px' }}>
+          <h2
+            style={{
+              fontSize: '1.5rem',
+              fontWeight: 800,
+              marginBottom: '16px',
+            }}
+          >
             Related Careers to Explore
           </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-            {relatedCareers.map((rc) => (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
+              gap: '20px',
+            }}
+          >
+            {relatedCareers.map((career) => (
               <div
-                key={rc.id}
-                onClick={() => {
-                  setSelectedCareerId(rc.id);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
+                key={career.id}
                 className="card card-hover"
-                style={{ cursor: 'pointer', padding: '20px' }}
+                onClick={() => {
+                  setSelectedCareerId(career.id);
+                  window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth',
+                  });
+                }}
+                style={{
+                  cursor: 'pointer',
+                  padding: '20px',
+                }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span className="career-category">{rc.category}</span>
-                  <span className="match-badge match-high">{rc.baseMatch}%</span>
-                </div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--dark-slate)', marginBottom: '6px' }}>
-                  {rc.title}
+                <span className="career-category">
+                  {career.category}
+                </span>
+
+                <h3
+                  style={{
+                    fontSize: '1.15rem',
+                    fontWeight: 700,
+                    margin: '8px 0',
+                  }}
+                >
+                  {career.title}
                 </h3>
-                <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                  {rc.description}
+
+                <p
+                  style={{
+                    color: 'var(--text-muted)',
+                    fontSize: '0.88rem',
+                  }}
+                >
+                  {career.description}
                 </p>
               </div>
             ))}
