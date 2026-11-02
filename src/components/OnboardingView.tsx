@@ -39,6 +39,96 @@ const iconMap: Record<string, React.ReactNode> = {
   Rocket: <Rocket size={22} />,
 };
 
+type PreferenceKey =
+  | 'soloVsTeam'
+  | 'structuredVsFlexible'
+  | 'officeVsRemote'
+  | 'peopleVsTask'
+  | 'creativeVsAnalytical'
+  | 'fastVsPredictable';
+
+const WORK_PREFERENCE_SLIDERS: {
+  key: PreferenceKey;
+  label: string;
+  left: string;
+  right: string;
+  descriptions: [string, string, string, string, string];
+}[] = [
+  {
+    key: 'soloVsTeam', label: 'Collaboration preference',
+    left: 'Solo work', right: 'Team collaboration',
+    descriptions: [
+      'Strongly prefers independent work and solo concentration',
+      'Leans toward working independently',
+      'Enjoys a balance of solo work and teamwork',
+      'Leans toward collaborating with others',
+      'Strongly prefers teamwork and shared projects',
+    ],
+  },
+  {
+    key: 'structuredVsFlexible', label: 'Work structure preference',
+    left: 'Structured & clear tasks', right: 'Flexible & open-ended',
+    descriptions: [
+      'Strongly prefers clear instructions and predictable routines',
+      'Leans toward structured plans and defined tasks',
+      'Enjoys a mix of structure and flexibility',
+      'Leans toward flexible tasks and changing plans',
+      'Strongly prefers open-ended work and freedom to adapt',
+    ],
+  },
+  {
+    key: 'officeVsRemote', label: 'Work location preference',
+    left: 'In-office presence', right: 'Fully remote freedom',
+    descriptions: [
+      'Strongly prefers working in person at a workplace',
+      'Leans toward working in person most days',
+      'Prefers a balance of in-person and remote work',
+      'Leans toward working remotely most days',
+      'Strongly prefers fully remote work',
+    ],
+  },
+  {
+    key: 'peopleVsTask', label: 'Daily work focus preference',
+    left: 'People-oriented', right: 'Task & systems-oriented',
+    descriptions: [
+      'Strongly prefers people-focused interactions and relationships',
+      'Leans toward helping and working directly with people',
+      'Enjoys a balance of people-focused and task-focused work',
+      'Leans toward completing tasks and working with systems',
+      'Strongly prefers task-focused and systems-oriented work',
+    ],
+  },
+  {
+    key: 'creativeVsAnalytical', label: 'Thinking style preference',
+    left: 'Creative expression', right: 'Analytical precision',
+    descriptions: [
+      'Strongly prefers imaginative and creative work',
+      'Leans toward generating ideas and creative expression',
+      'Enjoys a balance of creative and analytical thinking',
+      'Leans toward logic, research, and analysis',
+      'Strongly prefers analytical thinking and detailed problem-solving',
+    ],
+  },
+  {
+    key: 'fastVsPredictable', label: 'Work pace preference',
+    left: 'Fast-paced & changing', right: 'Predictable & steady',
+    descriptions: [
+      'Strongly prefers a fast-moving and changing workday',
+      'Leans toward variety and a faster pace',
+      'Enjoys a balance of variety and predictable routines',
+      'Leans toward a steady and predictable pace',
+      'Strongly prefers consistent routines and a steady pace',
+    ],
+  },
+];
+
+function getPreferenceDescription(key: PreferenceKey, value: number): string {
+  const slider = WORK_PREFERENCE_SLIDERS.find((item) => item.key === key);
+  if (!slider) return '';
+  const index = value < 20 ? 0 : value < 40 ? 1 : value <= 60 ? 2 : value <= 80 ? 3 : 4;
+  return slider.descriptions[index];
+}
+
 export default function OnboardingView() {
  const {
   onboardingStep,
@@ -419,134 +509,35 @@ const handleGenerateRecommendations = async () => {
 
             <div className="card" style={{ padding: '32px', marginBottom: '36px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                {/* Slider 1 */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 700 }}>
-                    <span style={{ color: userProfile.preferences.soloVsTeam < 45 ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      Solo work
-                    </span>
-                    <span style={{ color: userProfile.preferences.soloVsTeam > 55 ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      Team collaboration
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={userProfile.preferences.soloVsTeam}
-                    onChange={(e) => handleSliderChange('soloVsTeam', Number(e.target.value))}
-                    className="custom-range-slider"
-                  />
-                  <div style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-subtle)', marginTop: '4px' }}>
-                    {userProfile.preferences.soloVsTeam > 60 ? 'Leans heavily toward team collaboration' : userProfile.preferences.soloVsTeam < 40 ? 'Leans toward deep solo concentration' : 'Balanced blend of both'}
-                  </div>
-                </div>
-
-                {/* Slider 2 */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 700 }}>
-                    <span style={{ color: userProfile.preferences.structuredVsFlexible < 45 ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      Structured & clear tasks
-                    </span>
-                    <span style={{ color: userProfile.preferences.structuredVsFlexible > 55 ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      Flexible & open-ended
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={userProfile.preferences.structuredVsFlexible}
-                    onChange={(e) => handleSliderChange('structuredVsFlexible', Number(e.target.value))}
-                    className="custom-range-slider"
-                  />
-                  <div style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-subtle)', marginTop: '4px' }}>
-                    {userProfile.preferences.structuredVsFlexible > 60 ? 'Enjoys open-ended exploration' : userProfile.preferences.structuredVsFlexible < 40 ? 'Prefers clear roadmap & directives' : 'Adaptive balance'}
-                  </div>
-                </div>
-
-                {/* Slider 3 */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 700 }}>
-                    <span style={{ color: userProfile.preferences.officeVsRemote < 45 ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      In-office presence
-                    </span>
-                    <span style={{ color: userProfile.preferences.officeVsRemote > 55 ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      Fully remote freedom
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={userProfile.preferences.officeVsRemote}
-                    onChange={(e) => handleSliderChange('officeVsRemote', Number(e.target.value))}
-                    className="custom-range-slider"
-                  />
-                  <div style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-subtle)', marginTop: '4px' }}>
-                    Hybrid friendly (2–3 days sweet spot)
-                  </div>
-                </div>
-
-                {/* Slider 4 */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 700 }}>
-                    <span style={{ color: userProfile.preferences.peopleVsTask < 45 ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      People-oriented
-                    </span>
-                    <span style={{ color: userProfile.preferences.peopleVsTask > 55 ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      Task & systems-oriented
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={userProfile.preferences.peopleVsTask}
-                    onChange={(e) => handleSliderChange('peopleVsTask', Number(e.target.value))}
-                    className="custom-range-slider"
-                  />
-                </div>
-
-                {/* Slider 5 */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 700 }}>
-                    <span style={{ color: userProfile.preferences.creativeVsAnalytical < 45 ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      Creative expression
-                    </span>
-                    <span style={{ color: userProfile.preferences.creativeVsAnalytical > 55 ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      Analytical precision
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={userProfile.preferences.creativeVsAnalytical}
-                    onChange={(e) => handleSliderChange('creativeVsAnalytical', Number(e.target.value))}
-                    className="custom-range-slider"
-                  />
-                </div>
-
-                {/* Slider 6 */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 700 }}>
-                    <span style={{ color: userProfile.preferences.fastVsPredictable < 45 ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      Fast-paced & changing
-                    </span>
-                    <span style={{ color: userProfile.preferences.fastVsPredictable > 55 ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      Predictable & steady
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={userProfile.preferences.fastVsPredictable}
-                    onChange={(e) => handleSliderChange('fastVsPredictable', Number(e.target.value))}
-                    className="custom-range-slider"
-                  />
-                </div>
+                {WORK_PREFERENCE_SLIDERS.map((slider) => {
+                  const value = userProfile.preferences[slider.key];
+                  return (
+                    <div key={slider.key}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 700 }}>
+                        <span style={{ color: value < 45 ? 'var(--primary)' : 'var(--text-muted)' }}>
+                          {slider.left}
+                        </span>
+                        <span style={{ color: value > 55 ? 'var(--primary)' : 'var(--text-muted)', textAlign: 'right' }}>
+                          {slider.right}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={value}
+                        onChange={(e) => handleSliderChange(slider.key, Number(e.target.value))}
+                        className="custom-range-slider"
+                        aria-label={slider.label}
+                        aria-valuetext={getPreferenceDescription(slider.key, value)}
+                      />
+                      <div aria-live="polite" style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-subtle)', marginTop: '4px', minHeight: '20px' }}>
+                        {getPreferenceDescription(slider.key, value)}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -749,18 +740,12 @@ const handleGenerateRecommendations = async () => {
                   </button>
                 </div>
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <CheckCircle2 size={16} style={{ color: 'var(--primary)' }} />
-                    {userProfile.preferences.soloVsTeam > 50 ? 'Strong collaborative team preference' : 'Prefers solo focus'}
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <CheckCircle2 size={16} style={{ color: 'var(--primary)' }} />
-                    {userProfile.preferences.structuredVsFlexible > 50 ? 'Thrives in flexible & creative ambiguity' : 'Prefers structured guidelines'}
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <CheckCircle2 size={16} style={{ color: 'var(--primary)' }} />
-                    Hybrid flexibility curious (2–3 days remote)
-                  </li>
+                  {WORK_PREFERENCE_SLIDERS.map((slider) => (
+                    <li key={slider.key} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                      <CheckCircle2 size={16} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: '2px' }} />
+                      <span>{getPreferenceDescription(slider.key, userProfile.preferences[slider.key])}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
 
