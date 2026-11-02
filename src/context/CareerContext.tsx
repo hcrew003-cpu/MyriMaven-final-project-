@@ -161,7 +161,13 @@ function calculateMatch(
     const low = hasTerm(text, lowTerms);
     const high = hasTerm(text, highTerms);
     if (!low && !high) return; // No evidence: do not invent a workplace characteristic.
-    const preference = clamp(Number(preferences[key]) || 3, 1, 5);
+   
+const preference = clamp(
+  Math.round(Number(preferences[key] ?? 50) / 25) + 1,
+  1,
+  5
+);
+
     const fit = low && high ? 1 : low ? (5 - preference) / 4 : (preference - 1) / 4;
     preferenceEarned += fit;
     preferencePossible += 1;
@@ -382,8 +388,13 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
   };
   const toggleWhatIf = (key: keyof WhatIfState) =>
     setWhatIfToggles((prev) => ({ ...prev, [key]: !prev[key] }));
-  const updateWhatIfPreference = (key: PreferenceKey, value: number) =>
-    setWhatIfPreferences((prev) => ({ ...prev, [key]: clamp(value, 1, 5) }));
+ 
+const updateWhatIfPreference = (key: PreferenceKey, value: number) =>
+  setWhatIfPreferences((prev) => ({
+    ...prev,
+    [key]: clamp(value, 0, 100),
+  }));
+
   const resetWhatIf = () => {
     setWhatIfToggles({ ...EMPTY_PRIORITIES });
     setWhatIfPreferences({ ...userProfile.preferences });
