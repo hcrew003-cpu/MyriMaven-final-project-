@@ -726,7 +726,6 @@ const preferenceScore = average(
 considerations.push(
   'Work location and remote-work availability are not yet scored because reliable occupation-level remote-work evidence is unavailable.'
 );
-  );
 
   if (skillScore === null) {
     considerations.push(
