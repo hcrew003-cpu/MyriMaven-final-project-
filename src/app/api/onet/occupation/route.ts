@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       getOnet('/summary/related_occupations'),
 
       // Additional workplace information
-      getOnet('/summary/work_context'),
+      getOnet('/summary/work_context?start=1&end=100'),
       getOnet('/summary/work_styles'),
     ]);
 
