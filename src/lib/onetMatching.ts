@@ -334,6 +334,193 @@ function calculatePreferenceMatch(
   };
 }
 
+type WorkContextResponse = {
+  percentage_of_respondents?: number;
+  description?: string;
+};
+
+type WorkContextElement = {
+  id?: string;
+  name?: string;
+  response?: WorkContextResponse[];
+};
+
+function getWorkContextElements(
+  career: OnetCareer
+): WorkContextElement[] {
+  const context = career.workContext;
+
+  if (!context || typeof context !== 'object') {
+    return [];
+  }
+
+  if (!('element' in context)) {
+    return [];
+  }
+
+  const elements = context.element;
+
+  return Array.isArray(elements)
+    ? (elements as WorkContextElement[])
+    : [];
+}
+
+// These positions are exploratory interpretations
+// of O*NET response categories, not O*NET fit scores.
+function responsePosition(
+  description: string,
+  category: 'teamwork' | 'freedom' | 'deadlines'
+): number | null {
+  const value = description.toLowerCase().trim();
+
+  if (category === 'teamwork') {
+    if (value.includes('extremely important')) return 100;
+    if (value.includes('very important')) return 80;
+    if (value.includes('important')) return 60;
+    if (value.includes('somewhat important')) return 35;
+    if (value.includes('not important')) return 0;
+  }
+
+  if (category === 'freedom') {
+    if (value.includes('a lot of freedom')) return 100;
+    if (value.includes('a lot')) return 90;
+    if (value.includes('some freedom')) return 60;
+    if (value.includes('moderate freedom')) return 60;
+    if (value.includes('very little freedom')) return 15;
+    if (value.includes('no freedom')) return 0;
+  }
+
+  if (category === 'deadlines') {
+    if (value.includes('every day')) return 100;
+    if (value.includes('once a week or more')) return 75;
+    if (value.includes('once a month or more')) return 45;
+    if (value.includes('once a year or more')) return 20;
+    if (value.includes('never')) return 0;
+  }
+
+  return null;
+}
+
+function calculateWorkContextPreferences(
+  career: OnetCareer,
+  preferences: Preferences
+): {
+  scores: number[];
+  reasons: string[];
+} {
+  const elements = getWorkContextElements(career);
+  const scores: number[] = [];
+  const reasons: string[] = [];
+
+  const dimensions = [
+    {
+      id: '4.C.1.b.1.e',
+      key: 'soloVsTeam',
+      category: 'teamwork',
+      label: 'Collaboration',
+    },
+    {
+      id: '4.C.3.b.8',
+      key: 'structuredVsFlexible',
+      category: 'freedom',
+      label: 'Work structure',
+    },
+    {
+      id: '4.C.3.d.1',
+      key: 'fastVsPredictable',
+      category: 'deadlines',
+      label: 'Work pace',
+    },
+  ] as const;
+
+  for (const dimension of dimensions) {
+    const element = elements.find(
+      (item) => item.id === dimension.id
+    );
+
+    if (!element || !Array.isArray(element.response)) {
+      continue;
+    }
+
+    // Only use responses with a recognized description
+    // and a valid respondent percentage.
+    const validResponses = element.response
+      .map((response) => ({
+        percentage: Number(
+          response.percentage_of_respondents
+        ),
+        position: responsePosition(
+          response.description ?? '',
+          dimension.category
+        ),
+      }))
+      .filter(
+        (response) =>
+          Number.isFinite(response.percentage) &&
+          response.percentage > 0 &&
+          response.percentage <= 100 &&
+          response.position !== null
+      );
+
+    if (!validResponses.length) {
+      continue;
+    }
+
+    const totalPercentage = validResponses.reduce(
+      (sum, response) => sum + response.percentage,
+      0
+    );
+
+    if (totalPercentage <= 0) {
+      continue;
+    }
+
+    // Weighted interpretation of the available
+    // response categories.
+    const measuredPosition =
+      validResponses.reduce(
+        (sum, response) =>
+          sum +
+          response.percentage *
+            (response.position as number),
+        0
+      ) / totalPercentage;
+
+    // Work Pace slider:
+    // 0 = fast-paced, 100 = predictable.
+    // More frequent deadlines are treated as
+    // evidence of greater time pressure.
+    const occupationPosition =
+      dimension.category === 'deadlines'
+        ? 100 - measuredPosition
+        : measuredPosition;
+
+    const rawPreference = Number(
+      preferences[dimension.key] ?? 50
+    );
+
+    const userPosition = clamp(
+      Number.isFinite(rawPreference)
+        ? rawPreference
+        : 50
+    );
+
+    const fit = clamp(
+      100 - Math.abs(
+        userPosition - occupationPosition
+      )
+    );
+
+    scores.push(fit);
+
+    reasons.push(
+      `${dimension.label}: your preference was compared with O*NET workplace survey responses for ${element.name ?? 'this occupation'}.`
+    );
+  }
+
+  return { scores, reasons };
+}
+
 export function calculateOnetMatch(
   career: OnetCareer,
   profile: UserProfile,
@@ -413,10 +600,30 @@ export function calculateOnetMatch(
     selectedPreferences
   );
 
-  const preferenceScore = preferenceResult.score;
+  
+const workContextResult =
+  calculateWorkContextPreferences(
+    career,
+    selectedPreferences
+  );
+
+const combinedPreferenceScores = [
+  ...(preferenceResult.score === null
+    ? []
+    : [preferenceResult.score]),
+  ...workContextResult.scores,
+];
+
+const preferenceScore = average(
+  combinedPreferenceScores
+);
+
 
   if (preferenceScore !== null) {
-    reasons.push(...preferenceResult.reasons);
+    reasons.push(
+  ...preferenceResult.reasons,
+  ...workContextResult.reasons
+);
   }
 
   // GOALS
@@ -507,13 +714,18 @@ export function calculateOnetMatch(
       'Available occupation descriptions did not provide enough evidence to score work preferences.'
     );
   } else {
-    considerations.push(
-      'Work-preference estimates use descriptive keyword evidence, not validated workplace measurements.'
-    );
-  }
+  considerations.push(
+    'Work-preference estimates combine descriptive keyword evidence with available O*NET workplace survey responses.'
+  );
+}
 
   considerations.push(
-    'Remote work, schedule flexibility, work pace, and collaboration are not yet assessed from structured work-context data.'
+  'Collaboration, work structure, and work pace use available O*NET workplace survey responses. These are exploratory estimates, not guaranteed working conditions.'
+);
+
+considerations.push(
+  'Work location and remote-work availability are not yet scored because reliable occupation-level remote-work evidence is unavailable.'
+);
   );
 
   if (skillScore === null) {
