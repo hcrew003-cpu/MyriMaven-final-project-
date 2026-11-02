@@ -1,5 +1,5 @@
 
-import type { UserProfile } from '../types/career';
+import type { UserProfile, WhatIfState } from '../types/career';
 import type { OnetCareer } from '../context/CareerContext';
 
 export interface OnetMatchResult {
@@ -27,126 +27,110 @@ const CATEGORY_WEIGHTS: Record<MatchCategory, number> = {
 
 const INTEREST_TERMS: Record<string, string[]> = {
   Technology: [
-    'technology', 'software', 'computer', 'digital',
-    'programming', 'information systems',
+    'software', 'computer', 'programming',
+    'information technology', 'digital systems',
   ],
   Business: [
-    'business', 'management', 'marketing', 'sales',
-    'finance', 'administration', 'operations',
+    'business', 'management', 'marketing',
+    'sales', 'finance', 'operations',
   ],
   'Helping People': [
-    'help', 'support', 'service', 'care',
-    'counsel', 'assist', 'patient',
+    'counsel', 'patient', 'community',
+    'social service', 'assist clients', 'teach',
   ],
   Creativity: [
-    'creative', 'design', 'art', 'content',
-    'advertising', 'innovation',
+    'design', 'artistic', 'creative',
+    'advertising', 'visual', 'originality',
   ],
   Environment: [
-    'environment', 'sustainability', 'conservation',
-    'ecology', 'natural resources',
+    'environmental', 'ecology', 'conservation',
+    'sustainability', 'natural resources',
   ],
   'Problem Solving': [
-    'problem solving', 'critical thinking',
-    'troubleshooting', 'analysis', 'evaluate',
+    'problem solving', 'troubleshooting',
+    'critical thinking', 'diagnos',
   ],
   Leadership: [
-    'leadership', 'management', 'supervise',
-    'coordinate', 'direct', 'strategic planning',
+    'manage', 'supervis', 'leadership',
+    'direct operations', 'coordinate teams',
   ],
   'Working with Data': [
-    'data', 'analytics', 'statistics',
-    'research', 'forecasting', 'analysis',
+    'data analysis', 'statistics', 'analytics',
+    'data collection', 'quantitative',
   ],
   Communication: [
-    'communication', 'speaking', 'writing',
-    'listening', 'presentation', 'media',
+    'public speaking', 'writing', 'presentation',
+    'communication', 'negotiation',
   ],
   'Working with Children': [
-    'children', 'child', 'youth', 'school',
-    'early childhood', 'student',
+    'children', 'child development',
+    'early childhood', 'elementary school',
   ],
   Healthcare: [
-    'healthcare', 'health', 'medical',
-    'patient', 'clinical', 'nursing',
+    'patient', 'clinical', 'medical',
+    'nursing', 'healthcare',
   ],
   Entrepreneurship: [
-    'entrepreneurship', 'business development',
-    'business strategy', 'startup',
-    'product development',
+    'business development', 'entrepreneur',
+    'startup', 'business strategy',
   ],
 };
 
 const SKILL_TERMS: Record<string, string[]> = {
   Communication: [
-    'communication', 'speaking', 'writing',
-    'active listening', 'negotiation',
+    'speaking', 'writing', 'active listening',
+    'negotiation', 'communication',
   ],
   Leadership: [
-    'leadership', 'management of personnel',
-    'supervis', 'direct', 'coordinate',
+    'management of personnel', 'leadership',
+    'supervis', 'direct',
   ],
   Organization: [
-    'organizing', 'coordination', 'planning',
-    'time management', 'administration',
+    'time management', 'coordination',
+    'planning', 'organizing',
   ],
   'Problem Solving': [
-    'problem solving', 'critical thinking',
-    'troubleshooting', 'decision making',
+    'complex problem solving',
+    'critical thinking', 'troubleshooting',
   ],
   Research: [
-    'research', 'investigation',
-    'information gathering', 'analysis',
+    'research', 'information gathering',
+    'investigation',
   ],
   Creativity: [
-    'creativity', 'design', 'innovation',
-    'originality', 'creative thinking',
+    'design', 'originality', 'creative thinking',
+    'innovation',
   ],
   Teamwork: [
-    'teamwork', 'collaboration', 'cooperation',
+    'coordination', 'collaboration',
     'working with others',
   ],
   'Analytical Thinking': [
-    'analytical', 'analysis', 'critical thinking',
-    'mathematics', 'reasoning',
+    'analysis', 'mathematics',
+    'analytical thinking', 'reasoning',
   ],
 };
 
 const GOAL_TERMS: Record<string, string[]> = {
   Growth: [
-    'learning', 'development', 'training',
-    'advancement',
+    'training', 'professional development',
+    'learning', 'advancement',
   ],
   Leadership: [
-    'leadership', 'management', 'supervis',
-    'direct',
-  ],
-  'Work-life balance': [
-    'flexible schedule', 'work life balance',
-    'predictable schedule',
-  ],
-  'Income potential': [
-    'salary', 'earnings', 'wages', 'income',
+    'management', 'supervis',
+    'leadership', 'direct operations',
   ],
   'Helping others': [
-    'help', 'support', 'care', 'service',
-    'community',
-  ],
-  'Job stability': [
-    'job security', 'employment outlook',
-    'job stability',
+    'patient', 'community', 'counsel',
+    'social service', 'teach', 'assist clients',
   ],
   Creativity: [
-    'creative', 'design', 'innovation',
-    'advertising',
+    'design', 'creative', 'artistic',
+    'originality',
   ],
   'Making an impact': [
-    'improve', 'develop', 'support',
-    'community', 'environment',
-  ],
-  Flexibility: [
-    'flexible', 'remote', 'independent',
-    'variable schedule',
+    'community', 'conservation',
+    'public health', 'social service',
   ],
 };
 
@@ -154,149 +138,219 @@ function clamp(value: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function includesAny(text: string, terms: string[]): boolean {
-  return terms.some((term) => text.includes(term.toLowerCase()));
+function normalize(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-function getCareerText(career: OnetCareer): string {
-  return [
-    career.title,
-    career.description,
-    ...(career.tasks?.task ?? []).map((item) => item.title),
-    ...(career.skills?.element ?? []).flatMap((item) => [
-      item.name,
-      item.description,
-    ]),
-    ...(career.knowledge?.element ?? []).flatMap((item) => [
-      item.name,
-      item.description,
-    ]),
-  ]
-    .join(' ')
-    .toLowerCase();
+function matchesTerm(text: string, term: string): boolean {
+  const escaped = term
+    .toLowerCase()
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const pattern = new RegExp(`\\b${escaped}\\w*\\b`, 'i');
+
+  return pattern.test(text);
 }
 
-function getSkillText(career: OnetCareer): string {
-  return [
-    ...(career.skills?.element ?? []).flatMap((item) => [
-      item.name,
-      item.description,
-    ]),
-    ...(career.tasks?.task ?? []).map((item) => item.title),
-  ]
-    .join(' ')
-    .toLowerCase();
+function matchingTerms(
+  text: string,
+  terms: string[]
+): string[] {
+  return terms.filter((term) => matchesTerm(text, term));
+}
+
+function getOccupationSections(career: OnetCareer) {
+  const description = normalize(career.description ?? '');
+
+  const tasks = normalize(
+    (career.tasks?.task ?? [])
+      .map((task) => task.title)
+      .join(' ')
+  );
+
+  const skills = normalize(
+    (career.skills?.element ?? [])
+      .map((skill) => `${skill.name} ${skill.description}`)
+      .join(' ')
+  );
+
+  const knowledge = normalize(
+    (career.knowledge?.element ?? [])
+      .map((item) => `${item.name} ${item.description}`)
+      .join(' ')
+  );
+
+  return { description, tasks, skills, knowledge };
+}
+
+function evidenceStrength(
+  sections: ReturnType<typeof getOccupationSections>,
+  terms: string[]
+): { score: number; evidence: string[] } {
+  const descriptionMatches = matchingTerms(
+    sections.description,
+    terms
+  );
+  const taskMatches = matchingTerms(sections.tasks, terms);
+  const skillMatches = matchingTerms(sections.skills, terms);
+  const knowledgeMatches = matchingTerms(
+    sections.knowledge,
+    terms
+  );
+
+  // Description and tasks receive more emphasis than
+  // incidental mentions in skill or knowledge descriptions.
+  const score =
+    (descriptionMatches.length > 0 ? 45 : 0) +
+    (taskMatches.length > 0 ? 35 : 0) +
+    (skillMatches.length > 0 ? 15 : 0) +
+    (knowledgeMatches.length > 0 ? 5 : 0);
+
+  return {
+    score,
+    evidence: [
+      ...new Set([
+        ...descriptionMatches,
+        ...taskMatches,
+        ...skillMatches,
+        ...knowledgeMatches,
+      ]),
+    ],
+  };
 }
 
 function average(values: number[]): number | null {
-  if (values.length === 0) return null;
+  if (!values.length) return null;
 
-  return values.reduce((sum, value) => sum + value, 0) /
-    values.length;
+  return (
+    values.reduce((sum, value) => sum + value, 0) /
+    values.length
+  );
+}
+
+function normalizeGoal(goal: string): string {
+  const normalized = normalize(goal)
+    .replace(/[^a-z]/g, '');
+
+  const aliases: Record<string, string> = {
+    growth: 'Growth',
+    growthadvancement: 'Growth',
+    leadership: 'Leadership',
+    helpingothers: 'Helping others',
+    creativity: 'Creativity',
+    creativeexpression: 'Creativity',
+    makinganimpact: 'Making an impact',
+    impact: 'Making an impact',
+  };
+
+  return aliases[normalized] ?? goal;
 }
 
 export function calculateOnetMatch(
   career: OnetCareer,
-  profile: UserProfile
+  profile: UserProfile,
+  scenarioPriorities?: Partial<WhatIfState>
 ): OnetMatchResult {
-  const careerText = getCareerText(career);
-  const skillText = getSkillText(career);
+  const sections = getOccupationSections(career);
 
   const reasons: string[] = [];
   const considerations: string[] = [];
   const skillsToDevelop: string[] = [];
 
-  // 1. INTEREST MATCHING
-  const selectedInterests = profile.interests ?? [];
+  // INTERESTS
+  const interests = profile.interests ?? [];
+  const interestScores: number[] = [];
 
-  const interestScores = selectedInterests.map((interest) => {
+  for (const interest of interests) {
     const terms = INTEREST_TERMS[interest] ?? [
-      interest.toLowerCase(),
+      normalize(interest),
     ];
 
-    const matched = includesAny(careerText, terms);
+    const evidence = evidenceStrength(sections, terms);
+    interestScores.push(evidence.score);
 
-    if (matched) {
+    if (evidence.score >= 35) {
       reasons.push(
-        `Your interest in ${interest.toLowerCase()} connects with activities or knowledge associated with this career.`
+        `Your interest in ${interest.toLowerCase()} connects with ${evidence.evidence
+          .slice(0, 2)
+          .join(' and ')} mentioned in this occupation's O*NET information.`
       );
     }
-
-    return matched ? 100 : 0;
-  });
+  }
 
   const interestScore = average(interestScores);
 
-  // 2. SKILL MATCHING
+  // SKILLS
   const skillScores: number[] = [];
 
   for (const [skillName, rawRating] of Object.entries(
     profile.skills ?? {}
   )) {
-    const terms = SKILL_TERMS[skillName];
+    if (typeof rawRating !== 'number') continue;
 
-    if (!terms || typeof rawRating !== 'number') {
-      continue;
-    }
+    const terms = SKILL_TERMS[skillName] ?? [
+      normalize(skillName),
+    ];
 
-    if (!includesAny(skillText, terms)) {
-      continue;
-    }
+    const evidence = evidenceStrength(sections, terms);
+
+    if (evidence.score === 0) continue;
 
     const rating = clamp(rawRating, 1, 5);
 
-    // A student's self-rating indicates current familiarity,
-    // not an O*NET-measured requirement level.
-    const score = ((rating - 1) / 4) * 100;
+    // Self-assessed ability, not a validated proficiency test.
+    const readiness = ((rating - 1) / 4) * 100;
 
-    skillScores.push(score);
+    skillScores.push(
+      readiness * 0.7 + evidence.score * 0.3
+    );
 
     if (rating >= 4) {
       reasons.push(
-        `Your self-rated strength in ${skillName.toLowerCase()} may be useful in this occupation.`
+        `Your self-rated strength in ${skillName.toLowerCase()} may help with ${evidence.evidence[0]}-related work.`
       );
-    }
-
-    if (rating <= 3) {
+    } else {
       skillsToDevelop.push(skillName);
     }
   }
 
   const skillScore = average(skillScores);
 
-  // 3. WORK PREFERENCES
-  // The current API response does not provide reliable,
-  // structured work-context measures. Do not infer
-  // remote work, schedule, pace, or autonomy from a title.
+  // WORK PREFERENCES
+  // Not scored until reliable structured O*NET work-context
+  // measures are available. Do not guess remote work,
+  // schedule, autonomy or pace from occupational titles.
   const preferenceScore: number | null = null;
 
-  // 4. CAREER GOALS
-  const selectedGoals = profile.goals ?? [];
+  // GOALS
+  const activePriorities = scenarioPriorities
+    ? Object.entries(scenarioPriorities)
+        .filter(([, enabled]) => enabled)
+        .map(([key]) => key)
+    : [];
+
+  const selectedGoals = activePriorities.length
+    ? activePriorities
+    : profile.goals ?? [];
+
   const goalScores: number[] = [];
 
-  for (const goal of selectedGoals) {
+  for (const rawGoal of selectedGoals) {
+    const goal = normalizeGoal(rawGoal);
     const terms = GOAL_TERMS[goal];
 
+    // No earnings, job outlook or schedule information
+    // is currently included in the O*NET detail response.
     if (!terms) continue;
 
-    // Some goals require labour-market or work-context data
-    // that the current O*NET endpoint does not return.
-    if (
-      goal === 'Income potential' ||
-      goal === 'Job stability' ||
-      goal === 'Work-life balance' ||
-      goal === 'Flexibility'
-    ) {
-      continue;
-    }
+    const evidence = evidenceStrength(sections, terms);
+    goalScores.push(evidence.score);
 
-    const matched = includesAny(careerText, terms);
-
-    goalScores.push(matched ? 100 : 0);
-
-    if (matched) {
+    if (evidence.score >= 35) {
       reasons.push(
-        `Your goal of ${goal.toLowerCase()} has some alignment with the occupational activities described by O*NET.`
+        `Your goal of ${goal.toLowerCase()} connects with ${evidence.evidence
+          .slice(0, 2)
+          .join(' and ')} described in this occupation.`
       );
     }
   }
@@ -304,19 +358,16 @@ export function calculateOnetMatch(
   const goalScore = average(goalScores);
 
   const breakdown: OnetMatchResult['breakdown'] = {
-    interests: interestScore === null
-      ? null
-      : Math.round(interestScore),
-    skills: skillScore === null
-      ? null
-      : Math.round(skillScore),
+    interests:
+      interestScore === null ? null : Math.round(interestScore),
+    skills:
+      skillScore === null ? null : Math.round(skillScore),
     preferences: preferenceScore,
-    goals: goalScore === null
-      ? null
-      : Math.round(goalScore),
+    goals:
+      goalScore === null ? null : Math.round(goalScore),
   };
 
-  // Only include categories with actual matching evidence.
+  // Weighted average using only categories with evidence.
   let earned = 0;
   let availableWeight = 0;
 
@@ -328,17 +379,15 @@ export function calculateOnetMatch(
     if (categoryScore === null) continue;
 
     const weight = CATEGORY_WEIGHTS[category];
-
     earned += categoryScore * weight;
     availableWeight += weight;
   }
 
-  const score = availableWeight > 0
-    ? Math.round(earned / availableWeight)
-    : 0;
+  const score =
+    availableWeight > 0
+      ? Math.round(earned / availableWeight)
+      : 0;
 
-  // Confidence reflects how much of the intended
-  // scoring model has usable evidence.
   const confidence: OnetMatchResult['confidence'] =
     availableWeight >= 75
       ? 'strong'
@@ -348,25 +397,25 @@ export function calculateOnetMatch(
 
   if (preferenceScore === null) {
     considerations.push(
-      'Work-style compatibility has not been assessed because detailed work-context data is not yet connected.'
+      'Work preferences have not been scored because structured work-context data is not yet connected.'
     );
   }
 
   if (skillScore === null) {
     considerations.push(
-      'There was not enough overlapping skill information to assess your current strengths.'
+      'There was not enough overlapping skill information to evaluate your current strengths.'
     );
   }
 
   if (goalScore === null) {
     considerations.push(
-      'Your selected career goals could not be reliably assessed using the currently available occupational information.'
+      'Some goals, including salary, stability and work-life balance, require additional information.'
     );
   }
 
   if (availableWeight === 0) {
     considerations.push(
-      'Complete your onboarding profile to receive a more meaningful compatibility estimate.'
+      'Complete onboarding to receive a more meaningful compatibility estimate.'
     );
   }
 
