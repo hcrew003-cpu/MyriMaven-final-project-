@@ -1,3 +1,4 @@
+
 export interface Career {
   id: string;
   title: string;
@@ -27,8 +28,16 @@ export interface Career {
 export interface UserProfile {
   name: string;
   careerStage: string;
+
+  // Education and career background
+  major?: string;
+  minor?: string;
+  completedDegree?: string;
+  currentCareer?: string;
+
   interests: string[];
   skills: { [skillName: string]: number };
+
   preferences: {
     soloVsTeam: number;
     structuredVsFlexible: number;
@@ -37,6 +46,7 @@ export interface UserProfile {
     creativeVsAnalytical: number;
     fastVsPredictable: number;
   };
+
   goals: string[];
 }
 
