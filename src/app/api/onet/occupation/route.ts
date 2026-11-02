@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Validate O*NET occupation codes
   if (!code || !/^\d{2}-\d{4}\.\d{2}$/.test(code)) {
     return NextResponse.json(
       { error: 'Invalid occupation code.' },
@@ -35,7 +34,9 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
-      throw new Error(`O*NET request failed: ${response.status}`);
+      throw new Error(
+        `O*NET request failed for ${path}: ${response.status}`
+      );
     }
 
     return response.json();
@@ -50,6 +51,10 @@ export async function GET(request: NextRequest) {
       getOnet('/summary/knowledge'),
       getOnet('/summary/education'),
       getOnet('/summary/related_occupations'),
+
+      // Additional workplace information
+      getOnet('/summary/work_context'),
+      getOnet('/summary/work_styles'),
     ]);
 
     const section = (index: number) => {
@@ -69,6 +74,11 @@ export async function GET(request: NextRequest) {
       knowledge: section(2),
       education: section(3),
       relatedOccupations: section(4),
+
+      // New fields for What-If matching
+      workContext: section(5),
+      workStyles: section(6),
+
       source: 'O*NET Web Services',
     });
   } catch (error) {
