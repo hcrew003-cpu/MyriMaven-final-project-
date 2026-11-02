@@ -6,19 +6,19 @@ import { useCareer } from '../context/CareerContext';
 import type { OnetCareer } from '../context/CareerContext';
 import { calculateOnetMatch } from '../lib/onetMatching';
 import {
-  Sliders,
   BarChart3,
   Bookmark,
   ChevronRight,
   RefreshCw,
   Search,
+  Sliders,
 } from 'lucide-react';
 
-type Filter = 'all' | 'high' | 'creative' | 'business' | 'tech';
-
-type SearchOccupation = {
+type CatalogCareer = {
   id: string;
   title: string;
+  datalevel: boolean;
+  jobZone: string | null;
 };
 
 type RankedCareer = {
@@ -26,87 +26,80 @@ type RankedCareer = {
   match: ReturnType<typeof calculateOnetMatch>;
 };
 
-const SEARCH_TERMS = [
-  'management',
-  'business',
-  'technology',
-  'healthcare',
-  'education',
-  'design',
-  'engineering',
-  'science',
-  'finance',
-  'social services',
-];
+type Filter = 'all' | 'creative' | 'business' | 'tech';
 
-const MAX_CANDIDATES = 24;
+const DETAIL_LIMIT = 36;
+const PAGE_SIZE = 30;
 
-function extractOccupations(data: unknown): SearchOccupation[] {
-  if (!data || typeof data !== 'object') return [];
+const TOPIC_TERMS: Record<string, string[]> = {
+  Technology: [
+    'software', 'computer', 'network',
+    'information', 'cyber', 'technology', 'web',
+  ],
+  Business: [
+    'business', 'manager', 'management',
+    'marketing', 'finance', 'account',
+    'sales', 'operations',
+  ],
+  'Helping People': [
+    'counsel', 'social', 'therap',
+    'health', 'care', 'teacher',
+    'advisor', 'service',
+  ],
+  Creativity: [
+    'design', 'artist', 'writer',
+    'media', 'advertis', 'creative', 'architect',
+  ],
+  Environment: [
+    'environment', 'ecolog', 'conservation',
+    'agricultur', 'forestry', 'wildlife',
+  ],
+  'Problem Solving': [
+    'analyst', 'engineer', 'scientist',
+    'technician', 'research', 'investigator',
+  ],
+  Leadership: [
+    'manager', 'director', 'executive',
+    'supervisor', 'administrator',
+  ],
+  'Working with Data': [
+    'data', 'statistic', 'analyst',
+    'research', 'actuar', 'financial',
+  ],
+  Communication: [
+    'public relations', 'writer', 'reporter',
+    'marketing', 'teacher', 'communications',
+  ],
+  'Working with Children': [
+    'child', 'school', 'teacher',
+    'education', 'pediatric', 'youth',
+  ],
+  Healthcare: [
+    'medical', 'nurs', 'health',
+    'patient', 'physician', 'therap', 'clinical',
+  ],
+  Entrepreneurship: [
+    'business', 'manager', 'marketing',
+    'sales', 'product', 'executive',
+  ],
+};
 
-  const object = data as Record<string, unknown>;
-
-  const possibleLists = [
-    object.occupation,
-    object.occupations,
-    object.results,
-    object.careers,
-    object.items,
-    object.matches,
-  ];
-
-  const list = possibleLists.find(Array.isArray);
-
-  if (!Array.isArray(list)) return [];
-
-  return list
-    .map((item): SearchOccupation | null => {
-      if (!item || typeof item !== 'object') return null;
-
-      const record = item as Record<string, unknown>;
-
-      const id =
-        typeof record.code === 'string'
-          ? record.code
-          : typeof record.id === 'string'
-            ? record.id
-            : null;
-
-      const title =
-        typeof record.title === 'string'
-          ? record.title
-          : typeof record.name === 'string'
-            ? record.name
-            : null;
-
-      if (!id || !title) return null;
-
-      if (!/^\d{2}-\d{4}\.\d{2}$/.test(id)) return null;
-
-      return { id, title };
-    })
-    .filter((item): item is SearchOccupation => item !== null);
-}
-
-function matchesFilter(title: string, filter: Filter): boolean {
+function categoryMatch(
+  title: string,
+  filter: Filter
+): boolean {
   const value = title.toLowerCase();
 
   if (filter === 'creative') {
-    return /design|artist|writer|media|advertis|creative|architect/.test(
-      value
-    );
+    return /design|artist|writer|media|advertis|creative|architect/.test(value);
   }
 
   if (filter === 'business') {
-    return /manager|business|market|sales|finance|account|human resources|executive/.test(
-      value
-    );
+    return /manager|business|market|sales|financ|account|human resources|executive/.test(value);
   }
 
   if (filter === 'tech') {
-    return /software|computer|information technology|data|cyber|network|web developer/.test(
-      value
-    );
+    return /software|computer|information technology|data|cyber|network|web/.test(value);
   }
 
   return true;
@@ -124,329 +117,370 @@ export default function RecommendationsView() {
     isComparing,
   } = useCareer();
 
-  const [activeFilter, setActiveFilter] = useState<Filter>('all');
+  const [catalog, setCatalog] = useState<CatalogCareer[]>([]);
   const [careers, setCareers] = useState<OnetCareer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
+  const [mode, setMode] = useState<'recommended' | 'browse'>(
+    'recommended'
+  );
+
+  const [filter, setFilter] = useState<Filter>('all');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
-    async function loadCareers() {
-      setLoading(true);
-      setError('');
-      setCareers([]);
+    setLoadingCatalog(true);
+    setError('');
+    setCatalog([]);
+    setCareers([]);
 
-      try {
-        const searchResults = await Promise.allSettled(
-          SEARCH_TERMS.map(async (term) => {
-            const response = await fetch(
-              `/api/onet?keyword=${encodeURIComponent(term)}`
-            );
-
-            if (!response.ok) {
-              throw new Error(`O*NET search failed: ${term}`);
-            }
-
-            return extractOccupations(await response.json());
-          })
-        );
-
-        const unique = new Map<string, SearchOccupation>();
-
-        // Round-robin across subjects so the initial candidate
-        // pool is not dominated by one search term.
-        const groups = searchResults
-          .filter(
-            (
-              result
-            ): result is PromiseFulfilledResult<SearchOccupation[]> =>
-              result.status === 'fulfilled'
-          )
-          .map((result) => result.value);
-
-        const longest = Math.max(0, ...groups.map((g) => g.length));
-
-        for (let index = 0; index < longest; index++) {
-          for (const group of groups) {
-            const occupation = group[index];
-
-            if (occupation) {
-              unique.set(occupation.id, occupation);
-            }
-
-            if (unique.size >= MAX_CANDIDATES) break;
-          }
-
-          if (unique.size >= MAX_CANDIDATES) break;
-        }
-
-        const candidates = [...unique.values()];
-
-        if (candidates.length === 0) {
+    fetch('/api/onet/catalog', {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
           throw new Error(
-            'No O*NET occupations were returned. Check the search API.'
+            'Unable to retrieve the O*NET catalog.'
           );
         }
 
-        const detailedCareers: OnetCareer[] = [];
-
-        // Fetch a few occupations at a time.
-        for (let index = 0; index < candidates.length; index += 3) {
-          if (cancelled) return;
-
-          const batch = candidates.slice(index, index + 3);
-
-          const results = await Promise.allSettled(
-            batch.map(async (occupation) => {
-              const response = await fetch(
-                `/api/onet/occupation?code=${encodeURIComponent(
-                  occupation.id
-                )}`
-              );
-
-              if (!response.ok) {
-                throw new Error(
-                  `Unable to load ${occupation.title}`
-                );
-              }
-
-              const data = (await response.json()) as OnetCareer;
-
-              if (!data || !data.id || !data.title) {
-                throw new Error('Invalid occupation response');
-              }
-
-              return data;
-            })
-          );
-
-          for (const result of results) {
-            if (result.status === 'fulfilled') {
-              detailedCareers.push(result.value);
-            }
-          }
-
-          if (!cancelled) {
-            setCareers([...detailedCareers]);
-          }
-        }
-
-        if (detailedCareers.length === 0) {
-          throw new Error(
-            'O*NET occupations were found, but their details could not be loaded.'
+        return response.json();
+      })
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setCatalog(
+            Array.isArray(data.careers)
+              ? data.careers
+              : []
           );
         }
-      } catch (err) {
-        if (!cancelled) {
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
           setError(
             err instanceof Error
               ? err.message
-              : 'Unable to load recommendations.'
+              : 'Unable to load careers.'
           );
         }
-      } finally {
-        if (!cancelled) setLoading(false);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoadingCatalog(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [reloadKey]);
+
+  const candidates = useMemo(() => {
+    const interests = userProfile.interests ?? [];
+    const goals = userProfile.goals ?? [];
+
+    const words = [...interests, ...goals].flatMap(
+      (label) => TOPIC_TERMS[label] ?? []
+    );
+
+    const ranked = catalog
+      .map((career) => {
+        const title = career.title.toLowerCase();
+
+        const hits = words.filter((term) =>
+          title.includes(term)
+        ).length;
+
+        return { career, hits };
+      })
+      .sort(
+        (a, b) =>
+          b.hits - a.hits ||
+          a.career.title.localeCompare(b.career.title)
+      );
+
+    const relevant = ranked
+      .filter(({ hits }) => hits > 0)
+      .map(({ career }) => career);
+
+    const others = ranked
+      .filter(({ hits }) => hits === 0)
+      .map(({ career }) => career);
+
+    const selected: CatalogCareer[] = [];
+    let i = 0;
+
+    while (
+      selected.length < DETAIL_LIMIT &&
+      (i < relevant.length || i < others.length)
+    ) {
+      for (
+        let j = 0;
+        j < 3 &&
+        i * 3 + j < relevant.length &&
+        selected.length < DETAIL_LIMIT;
+        j++
+      ) {
+        selected.push(relevant[i * 3 + j]);
+      }
+
+      if (
+        others[i] &&
+        selected.length < DETAIL_LIMIT
+      ) {
+        selected.push(others[i]);
+      }
+
+      i++;
+    }
+
+    return selected;
+  }, [
+    catalog,
+    userProfile.interests,
+    userProfile.goals,
+  ]);
+
+  const candidateKey = candidates
+    .map((career) => career.id)
+    .join(',');
+
+  useEffect(() => {
+    if (!candidateKey) return;
+
+    const controller = new AbortController();
+
+    setLoadingDetails(true);
+    setCareers([]);
+
+    const ids = candidateKey.split(',');
+
+    async function load() {
+      const loaded: OnetCareer[] = [];
+
+      for (
+        let i = 0;
+        i < ids.length && !controller.signal.aborted;
+        i += 4
+      ) {
+        const batch = await Promise.allSettled(
+          ids.slice(i, i + 4).map(async (id) => {
+            const response = await fetch(
+              `/api/onet/occupation?code=${encodeURIComponent(id)}`,
+              { signal: controller.signal }
+            );
+
+            if (!response.ok) {
+              throw new Error(
+                'Occupation details unavailable'
+              );
+            }
+
+            return (await response.json()) as OnetCareer;
+          })
+        );
+
+        if (controller.signal.aborted) return;
+
+        loaded.push(
+          ...batch
+            .filter(
+              (
+                r
+              ): r is PromiseFulfilledResult<OnetCareer> =>
+                r.status === 'fulfilled'
+            )
+            .map((r) => r.value)
+            .filter(
+              (career) =>
+                career.id && career.title
+            )
+        );
+
+        setCareers([...loaded]);
+      }
+
+      if (!controller.signal.aborted) {
+        setLoadingDetails(false);
       }
     }
 
-    loadCareers();
+    void load();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadKey]);
+    return () => controller.abort();
+  }, [candidateKey]);
 
-  const rankedCareers = useMemo<RankedCareer[]>(() => {
-    return careers
-      .map((career) => ({
-        career,
-        match: calculateOnetMatch(career, userProfile),
-      }))
-      .sort((a, b) => {
-        // Prefer better-supported estimates when scores tie.
-        if (b.match.score !== a.match.score) {
-          return b.match.score - a.match.score;
-        }
+  const rankedCareers = useMemo<RankedCareer[]>(
+    () =>
+      careers
+        .map((career) => ({
+          career,
+          match: calculateOnetMatch(
+            career,
+            userProfile
+          ),
+        }))
+        .sort(
+          (a, b) =>
+            b.match.score - a.match.score
+        ),
+    [careers, userProfile]
+  );
 
-        const confidenceRank = {
-          strong: 3,
-          moderate: 2,
-          limited: 1,
-        };
+  const recommended = rankedCareers.filter(
+    ({ career }) =>
+      categoryMatch(career.title, filter)
+  );
 
-        return (
-          confidenceRank[b.match.confidence] -
-          confidenceRank[a.match.confidence]
-        );
-      });
-  }, [careers, userProfile]);
+  const browsing = useMemo(
+    () =>
+      catalog.filter(
+        (career) =>
+          categoryMatch(career.title, filter) &&
+          `${career.title} ${career.id}`
+            .toLowerCase()
+            .includes(query.trim().toLowerCase())
+      ),
+    [catalog, filter, query]
+  );
 
-  const filteredCareers = rankedCareers.filter(({ career, match }) => {
-    if (activeFilter === 'high') {
-      return match.score >= 90 &&
-        match.confidence !== 'limited';
-    }
+  const pageCount = Math.max(
+    1,
+    Math.ceil(browsing.length / PAGE_SIZE)
+  );
 
-    return matchesFilter(career.title, activeFilter);
-  });
+  const visibleCatalog = browsing.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE
+  );
 
-  const filters: { id: Filter; label: string }[] = [
-    { id: 'all', label: `All Matches (${rankedCareers.length})` },
-    { id: 'high', label: 'Top Matches (90%+)' },
-    { id: 'creative', label: 'Creative & Design' },
-    { id: 'business', label: 'Business & Leadership' },
-    { id: 'tech', label: 'Technology' },
-  ];
+  const openCareer = (id: string) => {
+    setSelectedCareerId(id);
+    setActiveView('detail');
+  };
 
   return (
     <div style={{ padding: '40px 0 80px' }}>
       <div className="container">
-        <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: 24 }}>
+          <span
+            style={{
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              color: 'var(--primary)',
+              textTransform: 'uppercase',
+            }}
+          >
+            Your Career Exploration Sandbox
+          </span>
+
+          <h1
+            style={{
+              fontSize: '2.4rem',
+              fontWeight: 800,
+              color: 'var(--dark-slate)',
+              marginTop: 4,
+            }}
+          >
+            Explore O*NET Careers
+          </h1>
+
+          <p
+            style={{
+              color: 'var(--text-muted)',
+              marginTop: 8,
+            }}
+          >
+            Browse the complete O*NET occupation catalog
+            or explore personalized estimates from a
+            profile-informed shortlist.
+          </p>
+
+          <p
+            style={{
+              color: 'var(--text-muted)',
+              fontSize: '0.85rem',
+              marginTop: 8,
+            }}
+          >
+            Match percentages are exploratory estimates,
+            not predictions of career success. Only
+            occupations with loaded details are scored.
+          </p>
+
           <div
             style={{
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
               flexWrap: 'wrap',
-              gap: '16px',
+              gap: 12,
+              marginTop: 20,
             }}
           >
-            <div>
-              <span
-                style={{
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  color: 'var(--primary)',
-                  textTransform: 'uppercase',
-                }}
-              >
-                Your Personalized Match Report
-              </span>
-
-              <h1
-                style={{
-                  fontSize: '2.4rem',
-                  fontWeight: 800,
-                  color: 'var(--dark-slate)',
-                  marginTop: '4px',
-                }}
-              >
-                Careers Matched to You
-              </h1>
-
-              <p
-                style={{
-                  color: 'var(--text-muted)',
-                  fontSize: '1.05rem',
-                  marginTop: '8px',
-                  maxWidth: '780px',
-                }}
-              >
-                Explore real O*NET occupations ranked using your
-                interests, self-rated skills, and available career
-                information.
-              </p>
-
-              <p
-                style={{
-                  color: 'var(--text-muted)',
-                  fontSize: '0.85rem',
-                  marginTop: '8px',
-                }}
-              >
-                Match scores are experimental estimates, not
-                predictions of career success. Results are ranked
-                from a sampled set of occupations.
-              </p>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                gap: '12px',
-                flexWrap: 'wrap',
-              }}
+            <button
+              className={
+                mode === 'recommended'
+                  ? 'btn-primary'
+                  : 'btn-secondary'
+              }
+              onClick={() => setMode('recommended')}
             >
-              <button
-                onClick={() => setActiveView('what-if')}
-                className="btn-secondary"
-                style={{ fontSize: '0.9rem' }}
-              >
-                <Sliders size={16} />
-                Test in What-If Sandbox
-              </button>
+              Personalized Recommendations
+            </button>
 
-              <button
-                onClick={() => setActiveView('compare')}
-                className="btn-primary"
-                style={{ fontSize: '0.9rem' }}
-              >
-                <BarChart3 size={16} />
-                Compare Selected ({compareCareerIds.length})
-              </button>
-            </div>
-          </div>
+            <button
+              className={
+                mode === 'browse'
+                  ? 'btn-primary'
+                  : 'btn-secondary'
+              }
+              onClick={() => setMode('browse')}
+            >
+              Browse All Careers ({catalog.length})
+            </button>
 
-          <div
-            style={{
-              display: 'flex',
-              gap: '8px',
-              marginTop: '24px',
-              flexWrap: 'wrap',
-            }}
-          >
-            {filters.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveFilter(tab.id)}
-                className={`tag-chip ${
-                  activeFilter === tab.id ? 'active' : ''
-                }`}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 'var(--radius-full)',
-                  fontWeight: 600,
-                  fontSize: '0.88rem',
-                  backgroundColor:
-                    activeFilter === tab.id
-                      ? 'var(--primary)'
-                      : 'white',
-                  color:
-                    activeFilter === tab.id
-                      ? 'white'
-                      : 'var(--dark-slate)',
-                  border:
-                    '1px solid ' +
-                    (activeFilter === tab.id
-                      ? 'var(--primary)'
-                      : 'var(--border-strong)'),
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
+            <button
+              className="btn-secondary"
+              onClick={() => setActiveView('what-if')}
+            >
+              <Sliders size={16} />
+              What-If Sandbox
+            </button>
+
+            <button
+              className="btn-secondary"
+              onClick={() => setActiveView('compare')}
+            >
+              <BarChart3 size={16} />
+              Compare ({compareCareerIds.length})
+            </button>
           </div>
         </div>
 
-        {loading && (
-          <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
-            Loading O*NET occupations and calculating matches...
-            {careers.length > 0
-              ? ` ${careers.length} occupations loaded.`
-              : ''}
+        {loadingCatalog && (
+          <p>
+            Loading the O*NET occupation catalog...
           </p>
         )}
 
         {error && (
-          <div className="card" style={{ marginBottom: '24px' }}>
-            <h2>Unable to load career recommendations</h2>
-            <p style={{ marginTop: '12px' }}>{error}</p>
+          <div
+            className="card"
+            style={{
+              padding: 24,
+              marginBottom: 20,
+            }}
+          >
+            <p>{error}</p>
+
             <button
               className="btn-primary"
-              style={{ marginTop: '16px' }}
-              onClick={() => setReloadKey((value) => value + 1)}
+              onClick={() =>
+                setReloadKey((n) => n + 1)
+              }
             >
               <RefreshCw size={16} />
               Retry
@@ -454,161 +488,378 @@ export default function RecommendationsView() {
           </div>
         )}
 
-        {!loading && !error && (
-          <p
-            style={{
-              fontSize: '0.85rem',
-              color: 'var(--text-muted)',
-              marginBottom: '20px',
-            }}
-          >
-            Showing {filteredCareers.length} of{' '}
-            {rankedCareers.length} O*NET occupations evaluated.
-          </p>
-        )}
+        {!loadingCatalog && !error && (
+          <>
+            {mode === 'browse' && (
+              <div style={{ marginBottom: 18 }}>
+                <label
+                  htmlFor="onet-catalog-search"
+                  style={{
+                    display: 'block',
+                    fontWeight: 700,
+                    marginBottom: 8,
+                  }}
+                >
+                  Search all {catalog.length} occupations
+                </label>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns:
-              'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
-            gap: '24px',
-          }}
-        >
-          {filteredCareers.map(({ career, match }) => {
-            const saved = isSaved(career.id);
-            const comparing = isComparing(career.id);
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}
+                >
+                  <Search size={18} />
 
-            return (
-              <div key={career.id} className="career-card">
-                <div>
-                  <div className="career-card-header">
-                    <span className="career-category">
-                      O*NET Occupation
-                    </span>
+                  <input
+                    id="onet-catalog-search"
+                    type="search"
+                    placeholder="Search career title or O*NET code..."
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      setPage(1);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: 12,
+                      border:
+                        '1px solid var(--border-strong)',
+                      borderRadius: 10,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
-                    <span
-                      className={`match-badge ${
-                        match.score >= 80
-                          ? 'match-high'
-                          : 'match-med'
-                      }`}
-                    >
-                      {match.score}% Estimated Match
-                    </span>
-                  </div>
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                flexWrap: 'wrap',
+                marginBottom: 20,
+              }}
+            >
+              {(
+                [
+                  ['all', 'All Fields'],
+                  ['creative', 'Creative & Design'],
+                  ['business', 'Business & Leadership'],
+                  ['tech', 'Technology'],
+                ] as [Filter, string][]
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  className={`tag-chip ${
+                    filter === key ? 'active' : ''
+                  }`}
+                  onClick={() => {
+                    setFilter(key);
+                    setPage(1);
+                  }}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 24,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
-                  <h2
-                    className="career-title"
-                    style={{ fontSize: '1.35rem' }}
-                  >
-                    {career.title}
-                  </h2>
+            {mode === 'recommended' ? (
+              <>
+                <p
+                  style={{
+                    color: 'var(--text-muted)',
+                    marginBottom: 18,
+                  }}
+                >
+                  {loadingDetails
+                    ? `Evaluating occupations... ${careers.length} loaded.`
+                    : `${rankedCareers.length} occupations evaluated from a shortlist drawn from ${catalog.length} available careers.`}
+                </p>
 
-                  <p className="career-desc">
-                    {career.description ||
-                      'Explore this occupation to learn about its responsibilities and required skills.'}
-                  </p>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns:
+                      'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
+                    gap: 24,
+                  }}
+                >
+                  {recommended.map(
+                    ({ career, match }) => (
+                      <div
+                        key={career.id}
+                        className="career-card"
+                      >
+                        <div>
+                          <div className="career-card-header">
+                            <span className="career-category">
+                              O*NET Occupation
+                            </span>
 
-                  <div className="fit-box">
-                    <strong>Why this may fit:</strong>{' '}
-                    {match.reasons[0] ??
-                      'Not enough matching evidence yet. Review the full profile for details.'}
-                  </div>
+                            <span
+                              className={`match-badge ${
+                                match.score >= 80
+                                  ? 'match-high'
+                                  : 'match-med'
+                              }`}
+                            >
+                              {match.score}% Estimated Match
+                            </span>
+                          </div>
 
-                  <div className="watchout-box">
-                    <strong>What to consider:</strong>{' '}
-                    {match.considerations[0] ??
-                      (match.skillsToDevelop.length > 0
-                        ? `You may want to develop your ${match.skillsToDevelop
-                            .slice(0, 2)
-                            .join(' and ')} skills.`
-                        : 'Review the daily tasks and education requirements to assess your fit.')}
-                  </div>
+                          <h2
+                            className="career-title"
+                            style={{
+                              fontSize: '1.35rem',
+                            }}
+                          >
+                            {career.title}
+                          </h2>
 
-                  <div className="tags-row">
-                    <span className="badge-tag">
-                      Evidence: {match.confidence}
-                    </span>
-                    <span className="badge-tag">
-                      O*NET {career.id}
-                    </span>
-                  </div>
+                          <p className="career-desc">
+                            {career.description ||
+                              'Open the occupation profile to learn more.'}
+                          </p>
+
+                          <div className="fit-box">
+                            <strong>
+                              Why this may fit:{' '}
+                            </strong>
+                            {match.reasons[0] ??
+                              'Limited matching evidence is available; review the occupation details.'}
+                          </div>
+
+                          <div className="watchout-box">
+                            <strong>
+                              What to consider:{' '}
+                            </strong>
+                            {match.considerations[0] ??
+                              (match.skillsToDevelop.length
+                                ? `Skills to develop: ${match.skillsToDevelop
+                                    .slice(0, 2)
+                                    .join(', ')}.`
+                                : 'Review tasks and education requirements before deciding.')}
+                          </div>
+
+                          <div className="tags-row">
+                            <span className="badge-tag">
+                              Evidence: {match.confidence}
+                            </span>
+
+                            <span className="badge-tag">
+                              O*NET {career.id}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="card-actions">
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 8,
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <button
+                              className="btn-secondary btn-sm"
+                              onClick={() =>
+                                toggleSaveCareer(
+                                  career.id
+                                )
+                              }
+                            >
+                              <Bookmark size={14} />
+                              {isSaved(career.id)
+                                ? 'Saved'
+                                : 'Save'}
+                            </button>
+
+                            <button
+                              className="btn-secondary btn-sm"
+                              onClick={() =>
+                                toggleCompareCareer(
+                                  career.id
+                                )
+                              }
+                            >
+                              <BarChart3 size={14} />
+                              {isComparing(career.id)
+                                ? 'In Compare'
+                                : 'Compare'}
+                            </button>
+                          </div>
+
+                          <button
+                            className="btn-primary btn-sm"
+                            onClick={() =>
+                              openCareer(career.id)
+                            }
+                          >
+                            Full Profile
+                            <ChevronRight size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  )}
                 </div>
 
-                <div className="card-actions">
+                {!loadingDetails &&
+                  recommended.length === 0 && (
+                    <p>
+                      No occupations match this
+                      filter. Try All Fields.
+                    </p>
+                  )}
+              </>
+            ) : (
+              <>
+                <p
+                  style={{
+                    color: 'var(--text-muted)',
+                    marginBottom: 16,
+                  }}
+                >
+                  Showing{' '}
+                  {browsing.length
+                    ? (page - 1) * PAGE_SIZE + 1
+                    : 0}
+                  –
+                  {Math.min(
+                    page * PAGE_SIZE,
+                    browsing.length
+                  )}{' '}
+                  of {browsing.length} occupations.
+                  Select any career to see its
+                  O*NET profile.
+                </p>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns:
+                      'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
+                    gap: 16,
+                  }}
+                >
+                  {visibleCatalog.map((career) => (
+                    <div
+                      className="card"
+                      key={career.id}
+                      style={{ padding: 22 }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: 'var(--text-muted)',
+                        }}
+                      >
+                        O*NET {career.id}
+                      </span>
+
+                      <h2
+                        style={{
+                          fontSize: 18,
+                          margin: '8px 0',
+                        }}
+                      >
+                        {career.title}
+                      </h2>
+
+                      {career.jobZone && (
+                        <p
+                          style={{
+                            fontSize: 13,
+                            color: 'var(--text-muted)',
+                            marginBottom: 12,
+                          }}
+                        >
+                          {career.jobZone}
+                        </p>
+                      )}
+
+                      {!career.datalevel && (
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: 'var(--text-muted)',
+                          }}
+                        >
+                          Limited O*NET detail available
+                        </p>
+                      )}
+
+                      <button
+                        className="btn-primary btn-sm"
+                        onClick={() =>
+                          openCareer(career.id)
+                        }
+                      >
+                        View Profile
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {browsing.length === 0 && (
+                  <p>
+                    No occupations match your search.
+                  </p>
+                )}
+
+                {pageCount > 1 && (
                   <div
                     style={{
                       display: 'flex',
-                      gap: '8px',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 16,
+                      marginTop: 28,
                     }}
                   >
                     <button
-                      onClick={() => toggleSaveCareer(career.id)}
-                      className={`btn-secondary btn-sm ${
-                        saved ? 'tag-active' : ''
-                      }`}
+                      className="btn-secondary"
+                      disabled={page <= 1}
+                      onClick={() =>
+                        setPage((p) =>
+                          Math.max(1, p - 1)
+                        )
+                      }
                     >
-                      <Bookmark
-                        size={14}
-                        style={{
-                          fill: saved
-                            ? 'var(--primary)'
-                            : 'none',
-                        }}
-                      />
-                      {saved ? 'Saved' : 'Save'}
+                      Previous
                     </button>
 
+                    <span>
+                      Page {page} of {pageCount}
+                    </span>
+
                     <button
-                      onClick={() => toggleCompareCareer(career.id)}
-                      className={`btn-secondary btn-sm ${
-                        comparing ? 'tag-active' : ''
-                      }`}
+                      className="btn-secondary"
+                      disabled={
+                        page >= pageCount
+                      }
+                      onClick={() =>
+                        setPage((p) =>
+                          Math.min(
+                            pageCount,
+                            p + 1
+                          )
+                        )
+                      }
                     >
-                      <BarChart3 size={14} />
-                      {comparing ? 'In Compare' : 'Compare'}
+                      Next
                     </button>
                   </div>
-
-                  <button
-                    onClick={() => {
-                      setSelectedCareerId(career.id);
-                      setActiveView('detail');
-                    }}
-                    className="btn-primary btn-sm"
-                  >
-                    Full Profile
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {!loading && !error && filteredCareers.length === 0 && (
-          <div
-            className="card"
-            style={{
-              textAlign: 'center',
-              padding: '40px',
-            }}
-          >
-            <Search size={28} style={{ marginBottom: '12px' }} />
-            <h2>No careers match this filter</h2>
-            <p style={{ marginTop: '8px' }}>
-              Try All Matches to see the available O*NET
-              recommendations.
-            </p>
-            <button
-              className="btn-primary"
-              style={{ marginTop: '16px' }}
-              onClick={() => setActiveFilter('all')}
-            >
-              Show All Matches
-            </button>
-          </div>
+                )}
+              </>
+            )}
+          </>
         )}
       </div>
     </div>
