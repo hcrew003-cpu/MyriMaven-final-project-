@@ -632,9 +632,10 @@ const scenario = calculateOnetMatch(
             }}
           >
             Move the sliders to explore alternative
-            preferences. These changes are temporary.
-            Work-preference scoring is not yet included
-            in the O*NET estimates below.
+preferences. These changes are temporary
+and can influence your O*NET career estimates
+when relevant evidence is available.
+Work location is not yet included in scoring.
           </p>
 
           <div
@@ -760,10 +761,10 @@ const scenario = calculateOnetMatch(
               marginTop: 10,
             }}
           >
-            Estimates are experimental. Only supported
-            O*NET evidence influences the scores.
-            Changing a slider does not yet change
-            the occupation match calculation.
+           Estimates are experimental and use available
+O*NET occupation evidence. Five work-preference
+sliders can influence career estimates.
+Work location is not yet scored.
           </p>
         </div>
 
