@@ -420,11 +420,14 @@ export default function WhatIfView() {
           userProfile
         );
 
-        const scenario = calculateOnetMatch(
-          career,
-          userProfile,
-          whatIfToggles
-        );
+       
+const scenario = calculateOnetMatch(
+  career,
+  userProfile,
+  whatIfToggles,
+  whatIfPreferences
+);
+
 
         return {
           career,
@@ -437,11 +440,14 @@ export default function WhatIfView() {
         };
       })
       .sort((a, b) => b.score - a.score);
-  }, [
-    onetCareers,
-    userProfile,
-    whatIfToggles,
-  ]);
+ 
+}, [
+  onetCareers,
+  userProfile,
+  whatIfToggles,
+  whatIfPreferences,
+]);
+
 
   const top = rankedCareers[0];
 
