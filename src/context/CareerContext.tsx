@@ -21,6 +21,8 @@ export interface OnetCareer {
     response?: { code: number; title: string; percentage_of_respondents: number }[];
   } | null;
   relatedOccupations: { occupation?: { code: string; title: string }[] } | null;
+    workContext?: unknown;
+  workStyles?: unknown;
 }
 
 type PreferenceKey = keyof UserProfile['preferences'];
