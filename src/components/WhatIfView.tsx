@@ -6,6 +6,15 @@ import { WhatIfState, UserProfile } from '../types/career';
 import { Sparkles, Sliders, TrendingUp, TrendingDown, RefreshCw, Bookmark, ChevronRight } from 'lucide-react';
 
 type PreferenceKey = keyof UserProfile['preferences'];
+// Convert stored 0–100 preferences into a displayed 1–5 rating.
+const toFivePointScale = (value: number): number => {
+  return Math.max(1, Math.min(5, Math.round(value / 25) + 1));
+};
+
+// Convert a 1–5 rating back to the existing 0–100 scale.
+const toHundredPointScale = (rating: number): number => {
+  return (rating - 1) * 25;
+};
 
 const priorities: { key: keyof WhatIfState; label: string }[] = [
   { key: 'workLifeBalance', label: 'Work-Life Balance' },
@@ -105,14 +114,52 @@ export default function WhatIfView() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
             {preferences.map(({ key, label, left, right }) => (
               <div key={key}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <label htmlFor={`what-if-${key}`} style={{ fontWeight: 700, color: 'var(--dark-slate)' }}>{label}</label>
-                  <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{whatIfPreferences[key]}/5</span>
-                </div>
-                <input id={`what-if-${key}`} type="range" min={1} max={5} step={1}
-                  value={whatIfPreferences[key]}
-                  onChange={(event) => updateWhatIfPreference(key, Number(event.target.value))}
-                  style={{ width: '100%', accentColor: 'var(--primary)' }} />
+                <div
+  style={{
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  }}
+>
+  <label
+    htmlFor={`what-if-${key}`}
+    style={{
+      fontWeight: 700,
+      color: 'var(--dark-slate)',
+    }}
+  >
+    {label}
+  </label>
+
+  <span
+    style={{
+      fontWeight: 700,
+      color: 'var(--primary)',
+    }}
+  >
+    {toFivePointScale(whatIfPreferences[key])}/5
+  </span>
+</div>
+
+<input
+  id={`what-if-${key}`}
+  type="range"
+  min={1}
+  max={5}
+  step={1}
+  value={toFivePointScale(whatIfPreferences[key])}
+  onChange={(event) =>
+    updateWhatIfPreference(
+      key,
+      toHundredPointScale(Number(event.target.value))
+    )
+  }
+  style={{
+    width: '100%',
+    accentColor: 'var(--primary)',
+  }}
+/>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
                   <span>{left}</span><span>{right}</span>
                 </div>
