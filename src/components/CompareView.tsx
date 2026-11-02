@@ -146,18 +146,21 @@ export default function CompareView() {
 
       const match = calculateOnetMatch(onet, userProfile);
 
-      return {
-        id,
-        title: onet.title,
-        category: 'O*NET Occupation',
-        description: onet.description,
-        score: match.score,
-        strengths: [],
-        whyFit: match.whyFit,
-        watchOut: match.watchOut,
-        environment: [],
-        education: 'See full O*NET profile',
-      };
+return {
+  id,
+  title: onet.title,
+  category: 'O*NET Occupation',
+  description: onet.description,
+  score: match.score,
+  strengths: [],
+  whyFit:
+    'This estimated match is based on your interests, skills, career goals, and work preferences. Open the full career profile to explore the details.',
+  watchOut:
+    'Consider the education requirements, daily responsibilities, and work environment to decide whether this career suits you.',
+  environment: [],
+  education: 'See full O*NET profile',
+};
+
     });
 
   const rowStyle: React.CSSProperties = {
