@@ -17,6 +17,7 @@ export interface OnetMatchResult {
 }
 
 type MatchCategory = keyof OnetMatchResult['breakdown'];
+type Preferences = UserProfile['preferences'];
 
 const CATEGORY_WEIGHTS: Record<MatchCategory, number> = {
   interests: 35,
@@ -134,6 +135,42 @@ const GOAL_TERMS: Record<string, string[]> = {
   ],
 };
 
+// Preference evidence comes from O*NET occupation content.
+// These terms are exploratory indicators, not validated
+// measurements of workplace conditions.
+const PREFERENCE_EVIDENCE = {
+  peopleVsTask: {
+    low: [
+      'counsel', 'patient', 'customer', 'client',
+      'teach', 'student', 'social service',
+      'assist people', 'provide care',
+    ],
+    high: [
+      'data analysis', 'programming',
+      'troubleshooting', 'technical systems',
+      'equipment maintenance', 'mathematics',
+      'statistical analysis', 'database',
+    ],
+    label: 'Daily focus',
+  },
+  creativeVsAnalytical: {
+    low: [
+      'design', 'artistic', 'originality',
+      'creative thinking', 'visual arts',
+      'develop concepts', 'creative',
+    ],
+    high: [
+      'data analysis', 'mathematics',
+      'statistics', 'critical thinking',
+      'analytical', 'quantitative',
+      'scientific research',
+    ],
+    label: 'Thinking style',
+  },
+} as const;
+
+type SupportedPreference = keyof typeof PREFERENCE_EVIDENCE;
+
 function clamp(value: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -147,14 +184,12 @@ function matchesTerm(text: string, term: string): boolean {
     .toLowerCase()
     .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  const pattern = new RegExp(`\\b${escaped}\\w*\\b`, 'i');
-
-  return pattern.test(text);
+  return new RegExp(`\\b${escaped}\\w*\\b`, 'i').test(text);
 }
 
 function matchingTerms(
   text: string,
-  terms: string[]
+  terms: readonly string[]
 ): string[] {
   return terms.filter((term) => matchesTerm(text, term));
 }
@@ -183,28 +218,26 @@ function getOccupationSections(career: OnetCareer) {
   return { description, tasks, skills, knowledge };
 }
 
+type Sections = ReturnType<typeof getOccupationSections>;
+
 function evidenceStrength(
-  sections: ReturnType<typeof getOccupationSections>,
-  terms: string[]
+  sections: Sections,
+  terms: readonly string[]
 ): { score: number; evidence: string[] } {
   const descriptionMatches = matchingTerms(
-    sections.description,
-    terms
+    sections.description, terms
   );
   const taskMatches = matchingTerms(sections.tasks, terms);
   const skillMatches = matchingTerms(sections.skills, terms);
   const knowledgeMatches = matchingTerms(
-    sections.knowledge,
-    terms
+    sections.knowledge, terms
   );
 
-  // Description and tasks receive more emphasis than
-  // incidental mentions in skill or knowledge descriptions.
   const score =
-    (descriptionMatches.length > 0 ? 45 : 0) +
-    (taskMatches.length > 0 ? 35 : 0) +
-    (skillMatches.length > 0 ? 15 : 0) +
-    (knowledgeMatches.length > 0 ? 5 : 0);
+    (descriptionMatches.length ? 45 : 0) +
+    (taskMatches.length ? 35 : 0) +
+    (skillMatches.length ? 15 : 0) +
+    (knowledgeMatches.length ? 5 : 0);
 
   return {
     score,
@@ -222,15 +255,12 @@ function evidenceStrength(
 function average(values: number[]): number | null {
   if (!values.length) return null;
 
-  return (
-    values.reduce((sum, value) => sum + value, 0) /
-    values.length
-  );
+  return values.reduce((sum, value) => sum + value, 0) /
+    values.length;
 }
 
 function normalizeGoal(goal: string): string {
-  const normalized = normalize(goal)
-    .replace(/[^a-z]/g, '');
+  const key = normalize(goal).replace(/[^a-z]/g, '');
 
   const aliases: Record<string, string> = {
     growth: 'Growth',
@@ -243,13 +273,72 @@ function normalizeGoal(goal: string): string {
     impact: 'Making an impact',
   };
 
-  return aliases[normalized] ?? goal;
+  return aliases[key] ?? goal;
+}
+
+function calculatePreferenceMatch(
+  sections: Sections,
+  preferences: Preferences
+): {
+  score: number | null;
+  reasons: string[];
+} {
+  const scores: number[] = [];
+  const reasons: string[] = [];
+
+  const keys: SupportedPreference[] = [
+    'peopleVsTask',
+    'creativeVsAnalytical',
+  ];
+
+  for (const key of keys) {
+    const config = PREFERENCE_EVIDENCE[key];
+
+    const low = evidenceStrength(sections, config.low);
+    const high = evidenceStrength(sections, config.high);
+
+    // No evidence means no score for this preference.
+    if (low.score === 0 && high.score === 0) continue;
+
+    // When both directions appear, use their relative
+    // evidence strengths rather than choosing arbitrarily.
+    const occupationPosition =
+      (high.score / (low.score + high.score)) * 100;
+
+    const rawPreference = Number(preferences[key] ?? 50);
+    const userPosition = clamp(
+      Number.isFinite(rawPreference) ? rawPreference : 50
+    );
+
+    // 100 means the preference and available evidence
+    // align; 0 means they point in opposite directions.
+    const fit = 100 - Math.abs(
+      userPosition - occupationPosition
+    );
+
+    scores.push(clamp(fit));
+
+    const evidence = [
+      ...low.evidence.slice(0, 1),
+      ...high.evidence.slice(0, 1),
+    ];
+
+    reasons.push(
+      `${config.label}: your preference was compared with occupation references to ${evidence.join(' and ')}.`
+    );
+  }
+
+  return {
+    score: average(scores),
+    reasons,
+  };
 }
 
 export function calculateOnetMatch(
   career: OnetCareer,
   profile: UserProfile,
-  scenarioPriorities?: Partial<WhatIfState>
+  scenarioPriorities?: Partial<WhatIfState>,
+  scenarioPreferences?: Preferences
 ): OnetMatchResult {
   const sections = getOccupationSections(career);
 
@@ -258,10 +347,9 @@ export function calculateOnetMatch(
   const skillsToDevelop: string[] = [];
 
   // INTERESTS
-  const interests = profile.interests ?? [];
   const interestScores: number[] = [];
 
-  for (const interest of interests) {
+  for (const interest of profile.interests ?? []) {
     const terms = INTEREST_TERMS[interest] ?? [
       normalize(interest),
     ];
@@ -297,8 +385,6 @@ export function calculateOnetMatch(
     if (evidence.score === 0) continue;
 
     const rating = clamp(rawRating, 1, 5);
-
-    // Self-assessed ability, not a validated proficiency test.
     const readiness = ((rating - 1) / 4) * 100;
 
     skillScores.push(
@@ -317,10 +403,21 @@ export function calculateOnetMatch(
   const skillScore = average(skillScores);
 
   // WORK PREFERENCES
-  // Not scored until reliable structured O*NET work-context
-  // measures are available. Do not guess remote work,
-  // schedule, autonomy or pace from occupational titles.
-  const preferenceScore: number | null = null;
+  // Baseline uses saved preferences.
+  // What-If uses temporary preferences when supplied.
+  const selectedPreferences =
+    scenarioPreferences ?? profile.preferences;
+
+  const preferenceResult = calculatePreferenceMatch(
+    sections,
+    selectedPreferences
+  );
+
+  const preferenceScore = preferenceResult.score;
+
+  if (preferenceScore !== null) {
+    reasons.push(...preferenceResult.reasons);
+  }
 
   // GOALS
   const activePriorities = scenarioPriorities
@@ -339,8 +436,8 @@ export function calculateOnetMatch(
     const goal = normalizeGoal(rawGoal);
     const terms = GOAL_TERMS[goal];
 
-    // No earnings, job outlook or schedule information
-    // is currently included in the O*NET detail response.
+    // Unsupported goals are excluded rather than
+    // assigned an invented earnings or schedule score.
     if (!terms) continue;
 
     const evidence = evidenceStrength(sections, terms);
@@ -359,15 +456,24 @@ export function calculateOnetMatch(
 
   const breakdown: OnetMatchResult['breakdown'] = {
     interests:
-      interestScore === null ? null : Math.round(interestScore),
+      interestScore === null
+        ? null
+        : Math.round(interestScore),
     skills:
-      skillScore === null ? null : Math.round(skillScore),
-    preferences: preferenceScore,
+      skillScore === null
+        ? null
+        : Math.round(skillScore),
+    preferences:
+      preferenceScore === null
+        ? null
+        : Math.round(preferenceScore),
     goals:
-      goalScore === null ? null : Math.round(goalScore),
+      goalScore === null
+        ? null
+        : Math.round(goalScore),
   };
 
-  // Weighted average using only categories with evidence.
+  // Weighted average of categories with evidence.
   let earned = 0;
   let availableWeight = 0;
 
@@ -379,6 +485,7 @@ export function calculateOnetMatch(
     if (categoryScore === null) continue;
 
     const weight = CATEGORY_WEIGHTS[category];
+
     earned += categoryScore * weight;
     availableWeight += weight;
   }
@@ -397,9 +504,17 @@ export function calculateOnetMatch(
 
   if (preferenceScore === null) {
     considerations.push(
-      'Work preferences have not been scored because structured work-context data is not yet connected.'
+      'Available occupation descriptions did not provide enough evidence to score work preferences.'
+    );
+  } else {
+    considerations.push(
+      'Work-preference estimates use descriptive keyword evidence, not validated workplace measurements.'
     );
   }
+
+  considerations.push(
+    'Remote work, schedule flexibility, work pace, and collaboration are not yet assessed from structured work-context data.'
+  );
 
   if (skillScore === null) {
     considerations.push(
@@ -409,7 +524,7 @@ export function calculateOnetMatch(
 
   if (goalScore === null) {
     considerations.push(
-      'Some goals, including salary, stability and work-life balance, require additional information.'
+      'Some goals, including salary, stability, and work-life balance, require additional information.'
     );
   }
 
