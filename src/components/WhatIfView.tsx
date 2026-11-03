@@ -13,6 +13,7 @@ import {
   TrendingDown,
   RefreshCw,
   Bookmark,
+  BookmarkCheck,
   ChevronRight,
   BarChart3,
 } from 'lucide-react';
@@ -635,7 +636,7 @@ const scenario = calculateOnetMatch(
 preferences. These changes are temporary
 and can influence your O*NET career estimates
 when relevant evidence is available.
-Work location is not yet included in scoring.
+Work location is estimated only when duties provide clear on-site evidence; remote availability is not verified.
           </p>
 
           <div
@@ -761,10 +762,10 @@ Work location is not yet included in scoring.
               marginTop: 10,
             }}
           >
-           Estimates are experimental and use available
-O*NET occupation evidence. Five work-preference
-sliders can influence career estimates.
-Work location is not yet scored.
+            Estimates are experimental and use available O*NET
+            occupation evidence. Work location only affects scores
+            when explicit on-site duties are identified; remote
+            availability is not verified.
           </p>
         </div>
 
@@ -958,27 +959,30 @@ Work location is not yet scored.
 
                 <div className="card-actions">
                   <button
-                    className="btn-secondary btn-sm"
-                    onClick={() =>
-                      toggleSaveCareer(career.id)
-                    }
+                    className={saved ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+                    onClick={() => toggleSaveCareer(career.id)}
+                    aria-pressed={saved}
+                    style={saved ? {
+                      backgroundColor: '#0c6957',
+                      borderColor: '#0c6957',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                    } : undefined}
                   >
-                    <Bookmark
-                      size={14}
-                      style={{
-                        fill: saved
-                          ? 'var(--primary)'
-                          : 'none',
-                      }}
-                    />
-                    {saved ? 'Saved' : 'Save'}
+                    {saved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+                    {saved ? 'Saved ✓' : 'Save'}
                   </button>
 
                   <button
-                    className="btn-secondary btn-sm"
-                    onClick={() =>
-                      toggleCompareCareer(career.id)
-                    }
+                    className={comparing ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+                    onClick={() => toggleCompareCareer(career.id)}
+                    aria-pressed={comparing}
+                    style={comparing ? {
+                      backgroundColor: '#0c6957',
+                      borderColor: '#0c6957',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                    } : undefined}
                   >
                     <BarChart3 size={14} />
                     {comparing
