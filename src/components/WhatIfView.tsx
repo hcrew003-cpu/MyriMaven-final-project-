@@ -957,61 +957,113 @@ Work location is estimated only when duties provide clear on-site evidence; remo
                   </div>
                 </div>
 
-                <div className="card-actions">
-                  <button
-                    className={saved ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
-                    onClick={() => toggleSaveCareer(career.id)}
-                    aria-pressed={saved}
-                    style={saved ? {
-                      backgroundColor: '#0c6957',
-                      borderColor: '#0c6957',
-                      color: '#ffffff',
-                      fontWeight: 700,
-                    } : undefined}
-                  >
-                    {saved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
-                    {saved ? 'Saved ✓' : 'Save'}
-                  </button>
+               
+<div
+  className="card-actions"
+  style={{
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: '10px',
+    width: '100%',
+    marginTop: 'auto',
+    paddingTop: '16px',
+  }}
+>
+  <button
+    className={saved ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+    onClick={() => toggleSaveCareer(career.id)}
+    aria-pressed={saved}
+    style={{
+      width: '100%',
+      minWidth: 0,
+      minHeight: '42px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '6px',
+      ...(saved
+        ? {
+            backgroundColor: '#0c6957',
+            borderColor: '#0c6957',
+            color: '#ffffff',
+            fontWeight: 700,
+          }
+        : {}),
+    }}
+  >
+    {saved ? (
+      <BookmarkCheck size={14} />
+    ) : (
+      <Bookmark size={14} />
+    )}
+    {saved ? 'Saved ✓' : 'Save'}
+  </button>
 
-                  <button
-                    className={comparing ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
-                    onClick={() => toggleCompareCareer(career.id)}
-                    aria-pressed={comparing}
-                    style={comparing ? {
-                      backgroundColor: '#0c6957',
-                      borderColor: '#0c6957',
-                      color: '#ffffff',
-                      fontWeight: 700,
-                    } : undefined}
-                  >
-                    <BarChart3 size={14} />
-                    {comparing
-                      ? 'Comparing'
-                      : 'Compare'}
-                  </button>
+  <button
+    className={comparing ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+    onClick={() => toggleCompareCareer(career.id)}
+    aria-pressed={comparing}
+    style={{
+      width: '100%',
+      minWidth: 0,
+      minHeight: '42px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '6px',
+      ...(comparing
+        ? {
+            backgroundColor: '#0c6957',
+            borderColor: '#0c6957',
+            color: '#ffffff',
+            fontWeight: 700,
+          }
+        : {}),
+    }}
+  >
+    <BarChart3 size={14} />
+    {comparing ? 'Comparing' : 'Compare'}
+  </button>
 
-                  <button
-                    className="btn-secondary btn-sm"
-                    onClick={() =>
-                      openMayaWithPrompt(
-                        `Help me explore the O*NET occupation ${career.title}. My baseline match estimate is ${item.baseline}%, and my What-If scenario estimate is ${item.score}%. Explain possible strengths, gaps, and questions to investigate. Do not treat these estimates as validated career predictions.`
-                      )
-                    }
-                  >
-                    <Sparkles size={14} />
-                    Ask Maya
-                  </button>
+  <button
+    className="btn-secondary btn-sm"
+    onClick={() =>
+      openMayaWithPrompt(
+        `Help me explore the O*NET occupation ${career.title}. My baseline match estimate is ${item.baseline}%, and my What-If scenario estimate is ${item.score}%. Explain possible strengths, gaps, and questions to investigate. Do not treat these estimates as validated career predictions.`
+      )
+    }
+    style={{
+      width: '100%',
+      minWidth: 0,
+      minHeight: '42px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '6px',
+    }}
+  >
+    <Sparkles size={14} />
+    Ask Maya
+  </button>
 
-                  <button
-                    className="btn-primary btn-sm"
-                    onClick={() =>
-                      openCareer(career.id)
-                    }
-                  >
-                    View Profile
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
+  <button
+    className="btn-primary btn-sm"
+    onClick={() => openCareer(career.id)}
+    style={{
+      width: '100%',
+      minWidth: 0,
+      minHeight: '42px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '6px',
+    }}
+  >
+    View Profile
+    <ChevronRight size={14} />
+  </button>
+</div>
+
               </div>
             );
           })}
