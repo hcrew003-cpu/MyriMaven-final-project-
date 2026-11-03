@@ -401,43 +401,59 @@ function responsePosition(
   return null;
 }
 
-// Conservative on-site indicators from an occupation's described duties.
-// This does NOT establish whether remote or hybrid jobs are available.
+// Exploratory location flexibility indicators from O*NET duties.
+// These are NOT employer remote-work policies or verified job arrangements.
+// Patterns intentionally match ordinary task wording rather than a few exact phrases.
 const ON_SITE_DUTY_PATTERNS: RegExp[] = [
-  /\b(?:perform|conduct|assist with) (?:surgery|surgeries|physical examinations|medical procedures)\b/i,
-  /\b(?:operate|repair|maintain|install) (?:industrial |heavy |manufacturing |construction )?(?:machinery|equipment|vehicles|aircraft|engines)\b/i,
-  /\b(?:construct|build|repair|install) (?:buildings|roads|bridges|pipelines|electrical wiring|plumbing)\b/i,
-  /\b(?:provide|administer) (?:direct |hands-on )?(?:patient care|bedside care|emergency medical care)\b/i,
-  /\b(?:inspect|patrol) (?:construction sites|buildings|facilities|premises)\b/i,
-  /\b(?:drive|operate) (?:trucks|buses|ambulances|trains|ships|forklifts)\b/i,
-  /\b(?:prepare|cook|serve) (?:meals|food|beverages)\b/i,
-  /\b(?:harvest|plant|cultivate) (?:crops|fields)\b/i,
+  /\b(?:patient|patients|resident|residents|client|clients)\b.{0,65}\b(?:examin|treat|care|assist|monitor|transport|administer|physical)\w*/i,
+  /\b(?:examin|treat|care for|assist|monitor|transport|administer)\w*\b.{0,65}\b(?:patient|patients|resident|residents)\b/i,
+  /\b(?:surgery|surgical|clinical procedure|physical examination|dental procedure|laboratory specimen|blood samples?)\b/i,
+  /\b(?:machinery|equipment|vehicles?|aircraft|engines?|tools?)\b.{0,60}\b(?:operat|repair|maintain|install|inspect|test|adjust|calibrat)\w*/i,
+  /\b(?:operat|repair|maintain|install|inspect|test|adjust|calibrat)\w*\b.{0,60}\b(?:machinery|equipment|vehicles?|aircraft|engines?|tools?)\b/i,
+  /\b(?:construction|job sites?|building sites?|factory|factories|warehouse|warehouses|production floor|field work|on.site|in.person)\b/i,
+  /\b(?:farm|farms|crops?|livestock|animals?|forests?|wildlife|soil|water samples?|field samples?)\b.{0,65}\b(?:collect|inspect|monitor|feed|plant|harvest|maintain|survey|test)\w*/i,
+  /\b(?:plant|harvest|feed|inspect|monitor|survey|collect)\w*\b.{0,65}\b(?:crops?|livestock|animals?|forests?|wildlife|soil|field samples?)\b/i,
+  /\b(?:drive|driving|deliver|delivery|transport|patrol|respond to emergencies|emergency response|security patrol)\b/i,
+  /\b(?:prepare|cook|serve|clean|sanitize|stock shelves|load|unload)\w*\b.{0,55}\b(?:food|meals?|beverages?|rooms?|facilities|merchandise|shipments?)\b/i,
+  /\b(?:teach|instruct|supervise)\w*\b.{0,55}\b(?:classrooms?|students?|children|pupils)\b/i,
+];
+
+// Digital/desk-based duties may be more location-flexible, but they do not
+// establish that a job is remote or hybrid. Use a smaller scoring effect.
+const DIGITAL_DUTY_PATTERNS: RegExp[] = [
+  /\b(?:analy[sz]|interpret|model|forecast|research|evaluate|review)\w*\b.{0,70}\b(?:data|information|reports?|financial|statistics|trends|markets?)\b/i,
+  /\b(?:develop|design|write|maintain|test|debug|program)\w*\b.{0,70}\b(?:software|code|applications?|websites?|digital|databases?|systems?)\b/i,
+  /\b(?:prepare|write|edit|draft|publish|create)\w*\b.{0,65}\b(?:reports?|documents?|content|plans?|proposals?|presentations?)\b/i,
+  /\b(?:coordinate|communicate|consult|advise|plan|schedule)\w*\b.{0,65}\b(?:projects?|teams?|clients?|operations|activities|meetings?)\b/i,
 ];
 
 function calculateWorkLocationPreference(
   sections: Sections,
   preferences: Preferences
 ): { score: number | null; reason: string | null } {
-  // Restrict evidence to occupation descriptions and actual tasks.
-  // Skill names and knowledge requirements alone do not imply presence.
   const duties = `${sections.description} ${sections.tasks}`;
-  const matches = ON_SITE_DUTY_PATTERNS.filter((pattern) =>
-    pattern.test(duties)
-  );
-  if (matches.length === 0) {
+  const onsite = ON_SITE_DUTY_PATTERNS.filter((pattern) => pattern.test(duties)).length;
+  const digital = DIGITAL_DUTY_PATTERNS.filter((pattern) => pattern.test(duties)).length;
+
+  if (onsite === 0 && digital === 0) {
     return { score: null, reason: null };
   }
 
   const raw = Number(preferences.officeVsRemote ?? 50);
   const remotePreference = clamp(Number.isFinite(raw) ? raw : 50);
 
-  // On-site duties are evidence against a fully remote preference,
-  // but not proof that all jobs in this occupation require attendance.
-  // 0 (in-office preference) => 100; 100 (remote) => 30.
-  const score = Math.round(100 - remotePreference * 0.7);
+  // If both kinds of duties appear, prefer caution: physical presence may
+  // still be necessary. This is a heuristic, not a remote eligibility test.
+  if (onsite > 0) {
+    return {
+      score: Math.round(100 - remotePreference * 0.7),
+      reason: 'Work location: O*NET duties suggest some physical or on-site work. A stronger remote preference may reduce this exploratory fit estimate; actual arrangements vary by employer.',
+    };
+  }
+
   return {
-    score,
-    reason: 'Work location: described hands-on or on-site duties may limit fully remote arrangements. This is a cautious estimate, not verified remote-job availability.',
+    score: Math.round(55 + remotePreference * 0.35),
+    reason: 'Work location: O*NET describes digital, analytical, or coordination duties that may offer location flexibility. This is only a weak indicator, not evidence that remote jobs are available.',
   };
 }
 
@@ -673,6 +689,12 @@ const preferenceScore = average(
 );
   }
 
+  if (workLocationResult.reason) {
+    considerations.push(workLocationResult.reason);
+  } else {
+    considerations.push('Work location: insufficient task evidence to estimate location flexibility for this occupation. The slider does not affect its score.');
+  }
+
   // GOALS
   const activePriorities = scenarioPriorities
     ? Object.entries(scenarioPriorities)
@@ -771,7 +793,7 @@ const preferenceScore = average(
 );
 
 considerations.push(
-  'Work location uses only explicit hands-on or on-site duty indicators. Where those are absent, location is unscored; no occupation is assumed remote-friendly. Employer-specific remote or hybrid availability is not verified.'
+  'Work location uses exploratory on-site and digital-duty indicators. A digital task does not establish remote availability, and employers may require attendance. Careers with insufficient evidence remain unscored for location.'
 );
 
   if (skillScore === null) {
