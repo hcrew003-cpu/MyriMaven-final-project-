@@ -6,6 +6,7 @@ import { useCareer } from '../context/CareerContext';
 import type { OnetCareer } from '../context/CareerContext';
 import type { UserProfile } from '../types/career';
 import { calculateOnetMatch } from '../lib/onetMatching';
+import CareerMarketOutlook from './CareerMarketOutlook';
 import { CAREERS } from '../data/careersData';
 import {
   ArrowLeft,
@@ -138,6 +139,8 @@ function OnetCareerDetail({
             </p>
           </div>
         </div>
+
+        <CareerMarketOutlook code={career.id} />
 
         <div
           style={{
@@ -387,9 +390,8 @@ function OnetCareerDetail({
           Services, U.S. Department of Labor/Employment
           and Training Administration. U.S. occupational
           information and education pathways may differ
-          from Canadian requirements. Saving, comparing,
-          for O*NET occupations
-          will be added in a later update.
+          from Canadian requirements. Labour market estimates
+          are shown separately and may cover broader occupation groups.
         </p>
       </div>
     </div>
