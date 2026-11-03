@@ -140,7 +140,10 @@ function OnetCareerDetail({
           </div>
         </div>
 
-        <CareerMarketOutlook code={career.id} />
+        <CareerMarketOutlook
+  code={career.id}
+  title={career.title}
+/>
 
         <div
           style={{
