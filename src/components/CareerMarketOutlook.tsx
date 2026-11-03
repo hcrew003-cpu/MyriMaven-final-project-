@@ -35,8 +35,10 @@ const jobBankLinks = {
 
 export default function CareerMarketOutlook({
   code,
+  title,
 }: {
   code: string;
+  title: string;
 }) {
   const [data, setData] = useState<OutlookResponse | null>(null);
   const [loading, setLoading] = useState(true);
