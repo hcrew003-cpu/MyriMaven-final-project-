@@ -8,6 +8,7 @@ import { calculateOnetMatch } from '../lib/onetMatching';
 import {
   BarChart3,
   Bookmark,
+BookmarkCheck,
   ChevronRight,
   RefreshCw,
   Search,
@@ -665,19 +666,41 @@ export default function RecommendationsView() {
                               flexWrap: 'wrap',
                             }}
                           >
-                            <button
-                              className="btn-secondary btn-sm"
-                              onClick={() =>
-                                toggleSaveCareer(
-                                  career.id
-                                )
-                              }
-                            >
-                              <Bookmark size={14} />
-                              {isSaved(career.id)
-                                ? 'Saved'
-                                : 'Save'}
-                            </button>
+                           
+<button
+  className={
+    isSaved(career.id)
+      ? 'btn-primary btn-sm'
+      : 'btn-secondary btn-sm'
+  }
+  onClick={() => toggleSaveCareer(career.id)}
+  aria-pressed={isSaved(career.id)}
+  style={{
+    backgroundColor: isSaved(career.id)
+      ? '#0c6957'
+      : undefined,
+    color: isSaved(career.id)
+      ? '#ffffff'
+      : undefined,
+    borderColor: isSaved(career.id)
+      ? '#0c6957'
+      : undefined,
+    fontWeight: isSaved(career.id)
+      ? 700
+      : 500,
+    transition: 'all 0.2s ease',
+  }}
+>
+  {isSaved(career.id) ? (
+    <BookmarkCheck size={14} />
+  ) : (
+    <Bookmark size={14} />
+  )}
+  <span>
+    {isSaved(career.id) ? 'Saved ✓' : 'Save'}
+  </span>
+</button>
+
 
                             <button
                               className="btn-secondary btn-sm"
