@@ -401,6 +401,46 @@ function responsePosition(
   return null;
 }
 
+// Conservative on-site indicators from an occupation's described duties.
+// This does NOT establish whether remote or hybrid jobs are available.
+const ON_SITE_DUTY_PATTERNS: RegExp[] = [
+  /\b(?:perform|conduct|assist with) (?:surgery|surgeries|physical examinations|medical procedures)\b/i,
+  /\b(?:operate|repair|maintain|install) (?:industrial |heavy |manufacturing |construction )?(?:machinery|equipment|vehicles|aircraft|engines)\b/i,
+  /\b(?:construct|build|repair|install) (?:buildings|roads|bridges|pipelines|electrical wiring|plumbing)\b/i,
+  /\b(?:provide|administer) (?:direct |hands-on )?(?:patient care|bedside care|emergency medical care)\b/i,
+  /\b(?:inspect|patrol) (?:construction sites|buildings|facilities|premises)\b/i,
+  /\b(?:drive|operate) (?:trucks|buses|ambulances|trains|ships|forklifts)\b/i,
+  /\b(?:prepare|cook|serve) (?:meals|food|beverages)\b/i,
+  /\b(?:harvest|plant|cultivate) (?:crops|fields)\b/i,
+];
+
+function calculateWorkLocationPreference(
+  sections: Sections,
+  preferences: Preferences
+): { score: number | null; reason: string | null } {
+  // Restrict evidence to occupation descriptions and actual tasks.
+  // Skill names and knowledge requirements alone do not imply presence.
+  const duties = `${sections.description} ${sections.tasks}`;
+  const matches = ON_SITE_DUTY_PATTERNS.filter((pattern) =>
+    pattern.test(duties)
+  );
+  if (matches.length === 0) {
+    return { score: null, reason: null };
+  }
+
+  const raw = Number(preferences.officeVsRemote ?? 50);
+  const remotePreference = clamp(Number.isFinite(raw) ? raw : 50);
+
+  // On-site duties are evidence against a fully remote preference,
+  // but not proof that all jobs in this occupation require attendance.
+  // 0 (in-office preference) => 100; 100 (remote) => 30.
+  const score = Math.round(100 - remotePreference * 0.7);
+  return {
+    score,
+    reason: 'Work location: described hands-on or on-site duties may limit fully remote arrangements. This is a cautious estimate, not verified remote-job availability.',
+  };
+}
+
 function calculateWorkContextPreferences(
   career: OnetCareer,
   preferences: Preferences
@@ -607,7 +647,13 @@ const workContextResult =
     selectedPreferences
   );
 
+const workLocationResult = calculateWorkLocationPreference(
+  sections,
+  selectedPreferences
+);
+
 const combinedPreferenceScores = [
+  ...(workLocationResult.score === null ? [] : [workLocationResult.score]),
   ...(preferenceResult.score === null
     ? []
     : [preferenceResult.score]),
@@ -622,7 +668,8 @@ const preferenceScore = average(
   if (preferenceScore !== null) {
     reasons.push(
   ...preferenceResult.reasons,
-  ...workContextResult.reasons
+  ...workContextResult.reasons,
+  ...(workLocationResult.reason ? [workLocationResult.reason] : [])
 );
   }
 
@@ -724,7 +771,7 @@ const preferenceScore = average(
 );
 
 considerations.push(
-  'Work location and remote-work availability are not yet scored because reliable occupation-level remote-work evidence is unavailable.'
+  'Work location uses only explicit hands-on or on-site duty indicators. Where those are absent, location is unscored; no occupation is assumed remote-friendly. Employer-specific remote or hybrid availability is not verified.'
 );
 
   if (skillScore === null) {
