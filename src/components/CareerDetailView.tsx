@@ -7,6 +7,7 @@ import type { OnetCareer } from '../context/CareerContext';
 import type { UserProfile } from '../types/career';
 import { calculateOnetMatch } from '../lib/onetMatching';
 import CareerMarketOutlook from './CareerMarketOutlook';
+import AICareerDevelopmentPlan from './AICareerDevelopmentPlan';
 import { CAREERS } from '../data/careersData';
 import {
   ArrowLeft,
@@ -144,7 +145,10 @@ function OnetCareerDetail({
   code={career.id}
   title={career.title}
 />
-
+        <AICareerDevelopmentPlan
+          career={career}
+          profile={profile}
+        />
         <div
           style={{
             display: 'grid',
