@@ -14,6 +14,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid occupation code.' }, { status: 400 });
   }
 
+  // TEMPORARY ASSIGNMENT 5 FAILURE TEST
+  if (
+    process.env.ONET_FAILURE_TEST === 'true' &&
+    code === '11-9151.00'
+  ) {
+    console.error(
+      'O*NET FAILURE TEST: Simulated 503 Service Unavailable',
+      { occupationCode: code }
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          'O*NET job outlook is temporarily unavailable. ' +
+          'You can still explore this career.',
+      },
+      { status: 503 }
+    );
+  }
+
   try {
     const response = await fetch(
       `${ONET_BASE}/mnm/careers/${encodeURIComponent(code)}/job_outlook`,
