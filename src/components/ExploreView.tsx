@@ -105,6 +105,11 @@ export default function ExploreView() {
     currentPage * PAGE_SIZE
   );
 
+  const changePage = (nextPage: number) => {
+    setPage(nextPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const openCareer = (id: string) => {
     setSelectedCareerId(id);
     setActiveView('detail');
@@ -248,9 +253,9 @@ export default function ExploreView() {
 
             {pageCount > 1 && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginTop: 30 }}>
-                <button className="btn-secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</button>
+                <button className="btn-secondary" disabled={currentPage === 1} onClick={() => changePage(currentPage - 1)}>Previous</button>
                 <span>Page {currentPage} of {pageCount}</span>
-                <button className="btn-secondary" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Next</button>
+                <button className="btn-secondary" disabled={currentPage === pageCount} onClick={() => changePage(currentPage + 1)}>Next</button>
               </div>
             )}
           </>
