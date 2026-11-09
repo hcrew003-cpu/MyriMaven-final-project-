@@ -94,12 +94,13 @@ export default function MayaDrawer() {
         ]);
       } else {
         setMessages((prev) => [
-          ...prev,
-          {
-            id: `notice-${Date.now()}`,
-            sender: 'I could not load the career details right now. Please try again shortly.',
-          },
-        ]);
+  ...prev,
+  {
+    id: `notice-${Date.now()}`,
+    sender: 'maya',
+    text: 'I could not load the career details right now. Please try again shortly.',
+  },
+]);
       }
       return;
     }
