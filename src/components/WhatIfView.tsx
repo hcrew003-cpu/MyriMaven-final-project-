@@ -7,6 +7,12 @@ import type { OnetCareer } from '../context/CareerContext';
 import type { WhatIfState, UserProfile } from '../types/career';
 import { calculateOnetMatch } from '../lib/onetMatching';
 import {
+  loadWhatIfScenarios,
+  saveWhatIfScenario,
+  deleteWhatIfScenario,
+  type SavedWhatIfScenario,
+} from '../lib/whatIfScenarios';
+import {
   Sparkles,
   Sliders,
   TrendingUp,
@@ -16,6 +22,9 @@ import {
   BookmarkCheck,
   ChevronRight,
   BarChart3,
+  Trash2,
+  FolderOpen,
+  Save,
 } from 'lucide-react';
 
 type PreferenceKey = keyof UserProfile['preferences'];
@@ -249,6 +258,90 @@ export default function WhatIfView() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+
+  const [scenarioName, setScenarioName] = useState('');
+  const [savedScenarios, setSavedScenarios] = useState<SavedWhatIfScenario[]>([]);
+  const [scenarioBusy, setScenarioBusy] = useState(false);
+  const [scenarioLoading, setScenarioLoading] = useState(false);
+  const [scenarioMessage, setScenarioMessage] = useState('');
+  const [scenarioError, setScenarioError] = useState('');
+
+  // Scenarios belong to the signed-in student; clear them on sign-out.
+  useEffect(() => {
+    let cancelled = false;
+    setSavedScenarios([]);
+    setScenarioMessage('');
+    setScenarioError('');
+    if (!authUser) {
+      setScenarioLoading(false);
+      return;
+    }
+    setScenarioLoading(true);
+    loadWhatIfScenarios()
+      .then((rows) => { if (!cancelled) setSavedScenarios(rows); })
+      .catch((err: unknown) => {
+        if (!cancelled) setScenarioError(err instanceof Error ? err.message : 'Could not load saved scenarios.');
+      })
+      .finally(() => { if (!cancelled) setScenarioLoading(false); });
+    return () => { cancelled = true; };
+  }, [authUser?.id]);
+
+  const handleSaveScenario = async () => {
+    if (!authUser) {
+      setActiveView('auth');
+      return;
+    }
+    if (!scenarioName.trim()) {
+      setScenarioError('Enter a name for your scenario first.');
+      return;
+    }
+    setScenarioBusy(true);
+    setScenarioError('');
+    setScenarioMessage('');
+    try {
+      const saved = await saveWhatIfScenario(scenarioName, whatIfPreferences, whatIfToggles);
+      setSavedScenarios((prev) => [saved, ...prev]);
+      setScenarioName('');
+      setScenarioMessage(`Saved “${saved.name}”. Your original profile was not changed.`);
+    } catch (err) {
+      setScenarioError(err instanceof Error ? err.message : 'Could not save this scenario.');
+    } finally {
+      setScenarioBusy(false);
+    }
+  };
+
+  const handleLoadScenario = (scenario: SavedWhatIfScenario) => {
+    for (const { key } of preferences) {
+      const value = scenario.preferences[key];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        updateWhatIfPreference(key, value);
+      }
+    }
+    for (const { key } of priorities) {
+      if (Boolean(whatIfToggles[key]) !== Boolean(scenario.priorities[key])) {
+        toggleWhatIf(key);
+      }
+    }
+    setScenarioError('');
+    setScenarioMessage(`Loaded “${scenario.name}”. Your career estimates will update.`);
+  };
+
+  const handleDeleteScenario = async (scenario: SavedWhatIfScenario) => {
+    if (!window.confirm(`Delete “${scenario.name}”? This cannot be undone.`)) return;
+    setScenarioBusy(true);
+    setScenarioError('');
+    setScenarioMessage('');
+    try {
+      await deleteWhatIfScenario(scenario.id);
+      setSavedScenarios((prev) => prev.filter((item) => item.id !== scenario.id));
+      setScenarioMessage(`Deleted “${scenario.name}”.`);
+    } catch (err) {
+      setScenarioError(err instanceof Error ? err.message : 'Could not delete this scenario.');
+    } finally {
+      setScenarioBusy(false);
+    }
+  };
+
 
   const hasProfile = Boolean(
     userProfile.interests.length ||
@@ -719,6 +812,68 @@ Work location is estimated only when duties provide clear on-site evidence; remo
             )}
           </div>
         </div>
+
+        <section className="card" style={{ padding: 24, marginBottom: 28 }} aria-label="Saved What-If scenarios">
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: 8 }}>
+            My Saved What-If Profiles
+          </h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: 18 }}>
+            Save your current sliders and priorities as a named scenario. Loading one will not overwrite your onboarding profile.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+            <input
+              type="text"
+              value={scenarioName}
+              maxLength={100}
+              onChange={(event) => setScenarioName(event.target.value)}
+              placeholder="e.g. Work-Life Balance Focus"
+              aria-label="Scenario name"
+              style={{ flex: '1 1 240px', minWidth: 0, padding: '10px 12px', border: '1px solid #CBD5E1', borderRadius: 8 }}
+            />
+            <button
+              type="button"
+              className="btn-primary btn-sm"
+              disabled={scenarioBusy || !authUser}
+              onClick={() => void handleSaveScenario()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}
+            >
+              <Save size={15} /> {scenarioBusy ? 'Please wait...' : 'Save Current Scenario'}
+            </button>
+          </div>
+          {!authUser && (
+            <p style={{ color: 'var(--text-muted)', marginBottom: 12 }}>
+              Sign in to save and retrieve your What-If profiles.
+            </p>
+          )}
+          {scenarioError && <p role="alert" style={{ color: '#B91C1C', marginBottom: 12 }}>{scenarioError}</p>}
+          {scenarioMessage && <p role="status" style={{ color: '#0C6957', marginBottom: 12 }}>{scenarioMessage}</p>}
+          {scenarioLoading ? (
+            <p>Loading saved scenarios...</p>
+          ) : savedScenarios.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)' }}>No saved scenarios yet.</p>
+          ) : (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {savedScenarios.map((scenario) => (
+                <div key={scenario.id} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'center', padding: 14, border: '1px solid #E2E8F0', borderRadius: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <strong>{scenario.name}</strong>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                      {priorities.filter(({ key }) => scenario.priorities[key]).map(({ label }) => label).join(', ') || 'No priorities selected'}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" className="btn-secondary btn-sm" disabled={scenarioBusy} onClick={() => handleLoadScenario(scenario)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                      <FolderOpen size={14} /> Load
+                    </button>
+                    <button type="button" className="btn-secondary btn-sm" disabled={scenarioBusy} onClick={() => void handleDeleteScenario(scenario)} aria-label={`Delete ${scenario.name}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         <div
           className="card"
