@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
@@ -8,6 +9,8 @@ import { getSupabaseClient } from '../lib/supabase';
 import { loadUserProfile, saveUserProfile } from '../lib/profile';
 import { loadSavedCareers, addSavedCareer, removeSavedCareer } from '../lib/savedCareers';
 import { loadComparedCareers, addComparedCareer, removeComparedCareer } from '../lib/comparedCareers';
+import { loadCareerHistory, recordCareerView } from '../lib/careerHistory';
+import type { CareerHistoryItem } from '../lib/careerHistory';
 
 // O*NET occupation details returned by /api/onet/occupation.
 export interface OnetCareer {
@@ -21,7 +24,7 @@ export interface OnetCareer {
     response?: { code: number; title: string; percentage_of_respondents: number }[];
   } | null;
   relatedOccupations: { occupation?: { code: string; title: string }[] } | null;
-    workContext?: unknown;
+  workContext?: unknown;
   workStyles?: unknown;
 }
 
@@ -35,10 +38,11 @@ interface CareerContextType {
   setActiveView: (view: ViewType) => void;
   selectedCareerId: string;
   setSelectedCareerId: (id: string) => void;
-  selectedCareer: Career; // Legacy prototype career; used by existing views.
+  selectedCareer: Career;
   selectedOnetCareer: OnetCareer | null;
   onetCareerLoading: boolean;
   onetCareerError: string;
+  careerHistory: CareerHistoryItem[];
   savedCareerIds: string[];
   toggleSaveCareer: (id: string) => void;
   isSaved: (id: string) => boolean;
@@ -162,13 +166,13 @@ function calculateMatch(
     const [lowTerms, highTerms] = PREFERENCE_TERMS[key];
     const low = hasTerm(text, lowTerms);
     const high = hasTerm(text, highTerms);
-    if (!low && !high) return; // No evidence: do not invent a workplace characteristic.
-   
-const preference = clamp(
-  Math.round(Number(preferences[key] ?? 50) / 25) + 1,
-  1,
-  5
-);
+    if (!low && !high) return;
+
+    const preference = clamp(
+      Math.round(Number(preferences[key] ?? 50) / 25) + 1,
+      1,
+      5
+    );
 
     const fit = low && high ? 1 : low ? (5 - preference) / 4 : (preference - 1) / 4;
     preferenceEarned += fit;
@@ -198,13 +202,13 @@ const preference = clamp(
     earned += 25 * matched / goals.length;
   }
 
-  // No user evidence means no meaningful match estimate.
   if (!possible) return 0;
   return Math.round(clamp((earned / possible) * 100, 0, 100));
 }
 
 export function CareerProvider({ children }: { children: React.ReactNode }) {
   const [activeView, setActiveViewState] = useState<ViewType>('landing');
+
   const setActiveView = useCallback((view: ViewType) => {
     setActiveViewState(view);
     const url = new URL(window.location.href);
@@ -229,6 +233,7 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
 
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+
   useEffect(() => {
     const supabase = getSupabaseClient();
     const finishGoogleRedirect = (user: User | null) => {
@@ -257,9 +262,6 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
   const [onetCareerLoading, setOnetCareerLoading] = useState(false);
   const [onetCareerError, setOnetCareerError] = useState('');
 
-  // Load an O*NET occupation when its official code is selected.
-  // Keep the legacy selectedCareer unchanged until the detail and other views
-  // are migrated, so current Recommendations/Save/Compare/What-If still work.
   useEffect(() => {
     const controller = new AbortController();
     if (!/^\d{2}-\d{4}\.\d{2}$/.test(selectedCareerId)) {
@@ -294,6 +296,8 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
 
     return () => controller.abort();
   }, [selectedCareerId]);
+
+  const [careerHistory, setCareerHistory] = useState<CareerHistoryItem[]>([]);
   const [savedCareerIds, setSavedCareerIds] = useState<string[]>([]);
   const [compareCareerIds, setCompareCareerIds] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
@@ -340,6 +344,50 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [authUser?.id]);
 
+  // Keep each student's recently viewed careers isolated to their account.
+  useEffect(() => {
+    let cancelled = false;
+    setCareerHistory([]);
+    if (!authUser) return;
+    loadCareerHistory(authUser)
+      .then((items) => { if (!cancelled) setCareerHistory(items); })
+      .catch((error) => { if (!cancelled) console.error('Failed to load career history:', error); });
+    return () => { cancelled = true; };
+  }, [authUser?.id]);
+
+  // Record careers only when their detail page is open.
+  useEffect(() => {
+    if (!authUser || activeView !== 'detail') return;
+
+    const isOnet = /^\d{2}-\d{4}\.\d{2}$/.test(selectedCareerId);
+    const title = isOnet
+      ? selectedOnetCareer?.id === selectedCareerId
+        ? selectedOnetCareer.title
+        : null
+      : CAREERS.find((career) => career.id === selectedCareerId)?.title;
+
+    if (!title) return;
+
+    let cancelled = false;
+
+    recordCareerView(authUser, selectedCareerId, title)
+      .then(() => loadCareerHistory(authUser))
+      .then((items) => {
+        if (!cancelled) setCareerHistory(items);
+      })
+      .catch((error) => {
+        if (!cancelled) console.error('Failed to record career view:', error);
+      });
+
+    return () => { cancelled = true; };
+  }, [
+    authUser?.id,
+    activeView,
+    selectedCareerId,
+    selectedOnetCareer?.id,
+    selectedOnetCareer?.title,
+  ]);
+
   // Scenario sliders start with the saved profile but never write to Supabase.
   useEffect(() => {
     setWhatIfPreferences({ ...userProfile.preferences });
@@ -347,13 +395,12 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
   }, [userProfile.preferences]);
 
   const selectedCareer = CAREERS.find((c) => c.id === selectedCareerId) || CAREERS[0];
+
   const toggleSaveCareer = async (id: string) => {
     if (!authUser) { alert('Please sign in to save careers.'); setActiveView('auth'); return; }
     const wasSaved = savedCareerIds.includes(id);
     try {
       if (wasSaved) {
-        // Free the comparison slot in Supabase before removing the saved career.
-        // This keeps both lists consistent even after signing out and back in.
         if (compareCareerIds.includes(id)) {
           await removeComparedCareer(authUser, id);
           setCompareCareerIds((prev) => prev.filter((careerId) => careerId !== id));
@@ -369,7 +416,9 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
       alert(error instanceof Error ? error.message : 'Could not update saved careers.');
     }
   };
+
   const isSaved = (id: string) => savedCareerIds.includes(id);
+
   const toggleCompareCareer = async (id: string) => {
     if (!authUser) { alert('Please sign in to compare careers.'); setActiveView('auth'); return; }
     const wasComparing = compareCareerIds.includes(id);
@@ -378,7 +427,10 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
         await removeComparedCareer(authUser, id);
         setCompareCareerIds((prev) => prev.filter((careerId) => careerId !== id));
       } else {
-        if (compareCareerIds.length >= 3) { alert('You can compare up to 3 careers. Remove one first.'); return; }
+        if (compareCareerIds.length >= 3) {
+          alert('You can compare up to 3 careers. Remove one first.');
+          return;
+        }
         await addComparedCareer(authUser, id);
         setCompareCareerIds((prev) => prev.includes(id) ? prev : [...prev, id]);
       }
@@ -387,27 +439,35 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
       alert(error instanceof Error ? error.message : 'Could not update comparisons.');
     }
   };
+
   const isComparing = (id: string) => compareCareerIds.includes(id);
-  const updateUserProfile = (updates: Partial<UserProfile>) => setUserProfile((prev) => ({ ...prev, ...updates }));
+  const updateUserProfile = (updates: Partial<UserProfile>) =>
+    setUserProfile((prev) => ({ ...prev, ...updates }));
+
   const saveProfile = async () => {
     if (!authUser) throw new Error('Please sign in to save your profile.');
     if (profileLoading) throw new Error('Please wait for your profile to finish loading.');
     await saveUserProfile(authUser, userProfile);
   };
+
   const toggleWhatIf = (key: keyof WhatIfState) =>
     setWhatIfToggles((prev) => ({ ...prev, [key]: !prev[key] }));
- 
-const updateWhatIfPreference = (key: PreferenceKey, value: number) =>
-  setWhatIfPreferences((prev) => ({
-    ...prev,
-    [key]: clamp(value, 0, 100),
-  }));
+
+  const updateWhatIfPreference = (key: PreferenceKey, value: number) =>
+    setWhatIfPreferences((prev) => ({
+      ...prev,
+      [key]: clamp(value, 0, 100),
+    }));
 
   const resetWhatIf = () => {
     setWhatIfToggles({ ...EMPTY_PRIORITIES });
     setWhatIfPreferences({ ...userProfile.preferences });
   };
-  const openMayaWithPrompt = (prompt: string) => { setMayaPrompt(prompt); setIsMayaOpen(true); };
+
+  const openMayaWithPrompt = (prompt: string) => {
+    setMayaPrompt(prompt);
+    setIsMayaOpen(true);
+  };
 
   const getWhatIfRankedCareers = (): RankedCareer[] => {
     return CAREERS.map((career) => {
@@ -429,11 +489,13 @@ const updateWhatIfPreference = (key: PreferenceKey, value: number) =>
     <CareerContext.Provider value={{
       authUser, authLoading, activeView, setActiveView,
       selectedCareerId, setSelectedCareerId, selectedCareer,
-       selectedOnetCareer, onetCareerLoading, onetCareerError,
+      selectedOnetCareer, onetCareerLoading, onetCareerError,
+      careerHistory,
       savedCareerIds, toggleSaveCareer, isSaved,
       compareCareerIds, toggleCompareCareer, isComparing,
       userProfile, updateUserProfile, saveProfile,
-      whatIfToggles, toggleWhatIf, whatIfPreferences, updateWhatIfPreference, resetWhatIf,
+      whatIfToggles, toggleWhatIf, whatIfPreferences,
+      updateWhatIfPreference, resetWhatIf,
       isMayaOpen, setIsMayaOpen, mayaPrompt, openMayaWithPrompt,
       onboardingStep, setOnboardingStep, getWhatIfRankedCareers,
     }}>
