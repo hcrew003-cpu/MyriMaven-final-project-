@@ -1,15 +1,17 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
 import { useCareer, type OnetCareer } from '../context/CareerContext';
 import { CAREERS } from '../data/careersData';
+import { loadCareerNotes, saveCareerNote, deleteCareerNote } from '../lib/careerNotes';
 import {
   Bookmark,
   BarChart3,
   Trash2,
   ArrowRight,
   Compass,
+  NotebookPen,
+  Save,
 } from 'lucide-react';
 
 const isOnetId = (id: string) =>
@@ -18,6 +20,7 @@ const isOnetId = (id: string) =>
 export default function SavedView() {
   const {
     savedCareerIds,
+    authUser,
     toggleSaveCareer,
     setSelectedCareerId,
     setActiveView,
@@ -32,6 +35,79 @@ export default function SavedView() {
 
   const [loading, setLoading] = useState(false);
   const [loadErrors, setLoadErrors] = useState<string[]>([]);
+
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [savedNotes, setSavedNotes] = useState<Record<string, string>>({});
+  const [notesLoading, setNotesLoading] = useState(true);
+  const [notesError, setNotesError] = useState('');
+  const [busyNoteId, setBusyNoteId] = useState<string | null>(null);
+  const [noteFeedback, setNoteFeedback] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    setNoteDrafts({});
+    setSavedNotes({});
+    setNoteFeedback({});
+    setNotesError('');
+
+    if (!authUser) {
+      setNotesLoading(false);
+      return;
+    }
+
+    setNotesLoading(true);
+    loadCareerNotes(authUser)
+      .then((notes) => {
+        if (cancelled) return;
+        const loaded = Object.fromEntries(notes.map((item) => [item.career_id, item.note]));
+        setSavedNotes(loaded);
+        setNoteDrafts(loaded);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setNotesError(error instanceof Error ? error.message : 'Unable to load notes.');
+      })
+      .finally(() => {
+        if (!cancelled) setNotesLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [authUser?.id]);
+
+  const handleSaveNote = async (careerId: string) => {
+    if (!authUser || busyNoteId || notesLoading) return;
+    const note = noteDrafts[careerId] ?? '';
+    setBusyNoteId(careerId);
+    setNoteFeedback((prev) => ({ ...prev, [careerId]: '' }));
+    try {
+      await saveCareerNote(authUser, careerId, note);
+      setSavedNotes((prev) => ({ ...prev, [careerId]: note }));
+      setNoteFeedback((prev) => ({ ...prev, [careerId]: 'Note saved!' }));
+    } catch (error) {
+      setNoteFeedback((prev) => ({ ...prev, [careerId]: error instanceof Error ? error.message : 'Could not save note.' }));
+    } finally {
+      setBusyNoteId(null);
+    }
+  };
+
+  const handleDeleteNote = async (careerId: string) => {
+    if (!authUser || busyNoteId || notesLoading) return;
+    setBusyNoteId(careerId);
+    setNoteFeedback((prev) => ({ ...prev, [careerId]: '' }));
+    try {
+      await deleteCareerNote(authUser, careerId);
+      setSavedNotes((prev) => {
+        const updated = { ...prev };
+        delete updated[careerId];
+        return updated;
+      });
+      setNoteDrafts((prev) => ({ ...prev, [careerId]: '' }));
+      setNoteFeedback((prev) => ({ ...prev, [careerId]: 'Note deleted.' }));
+    } catch (error) {
+      setNoteFeedback((prev) => ({ ...prev, [careerId]: error instanceof Error ? error.message : 'Could not delete note.' }));
+    } finally {
+      setBusyNoteId(null);
+    }
+  };
 
   const onetIds = savedCareerIds.filter(isOnetId);
   const onetKey = onetIds.join('|');
@@ -224,6 +300,7 @@ export default function SavedView() {
           </div>
         ) : (
           <>
+            {notesError && <p role="alert" style={{ color: '#b91c1c', marginBottom: 16 }}>Could not load personal notes: {notesError}</p>}
             {loading && (
               <p
                 style={{
@@ -408,6 +485,51 @@ export default function SavedView() {
                         >
                           <Trash2 size={18} />
                         </button>
+                      </div>
+                    </div>
+
+                    {/* Personal notes are private to the signed-in student. */}
+                    <div style={{ borderTop: '1px solid #e5e7eb', marginTop: 20, paddingTop: 18 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                        <NotebookPen size={18} style={{ color: 'var(--primary)' }} />
+                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--dark-slate)' }}>
+                          My Personal Notes
+                        </h3>
+                      </div>
+                      <textarea
+                        aria-label={`Personal notes for ${career.title}`}
+                        placeholder="What interests you about this career? What would you like to research?"
+                        value={noteDrafts[career.id] ?? ''}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setNoteDrafts((prev) => ({ ...prev, [career.id]: value }));
+                          setNoteFeedback((prev) => ({ ...prev, [career.id]: '' }));
+                        }}
+                        disabled={!authUser || notesLoading || busyNoteId === career.id}
+                        rows={3}
+                        style={{ width: '100%', resize: 'vertical', padding: 12, border: '1px solid #d1d5db', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, lineHeight: 1.6, boxSizing: 'border-box' }}
+                      />
+                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
+                        <button
+                          type="button"
+                          className="btn-primary btn-sm"
+                          disabled={!authUser || notesLoading || busyNoteId !== null || (noteDrafts[career.id] ?? '') === (savedNotes[career.id] ?? '')}
+                          onClick={() => handleSaveNote(career.id)}
+                        >
+                          <Save size={15} />
+                          {busyNoteId === career.id ? 'Saving...' : 'Save Note'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          disabled={!authUser || notesLoading || busyNoteId !== null || !(savedNotes[career.id] ?? '')}
+                          onClick={() => handleDeleteNote(career.id)}
+                        >
+                          <Trash2 size={15} /> Delete Note
+                        </button>
+                        <span role="status" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                          {noteFeedback[career.id] || ((noteDrafts[career.id] ?? '') !== (savedNotes[career.id] ?? '') ? 'Unsaved changes' : '')}
+                        </span>
                       </div>
                     </div>
                   </div>
