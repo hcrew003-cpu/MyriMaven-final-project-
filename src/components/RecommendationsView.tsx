@@ -1,89 +1,22 @@
 
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useCareer } from '../context/CareerContext';
-import type { OnetCareer } from '../context/CareerContext';
-import { calculateOnetMatch } from '../lib/onetMatching';
+import { useOnetRecommendations } from '../hooks/useOnetRecommendations';
 import {
   BarChart3,
   Bookmark,
-BookmarkCheck,
+  BookmarkCheck,
   ChevronRight,
   RefreshCw,
   Search,
   Sliders,
 } from 'lucide-react';
 
-type CatalogCareer = {
-  id: string;
-  title: string;
-  datalevel: boolean;
-  jobZone: string | null;
-};
-
-type RankedCareer = {
-  career: OnetCareer;
-  match: ReturnType<typeof calculateOnetMatch>;
-};
-
 type Filter = 'all' | 'creative' | 'business' | 'tech';
 
-const DETAIL_LIMIT = 36;
 const PAGE_SIZE = 30;
-
-const TOPIC_TERMS: Record<string, string[]> = {
-  Technology: [
-    'software', 'computer', 'network',
-    'information', 'cyber', 'technology', 'web',
-  ],
-  Business: [
-    'business', 'manager', 'management',
-    'marketing', 'finance', 'account',
-    'sales', 'operations',
-  ],
-  'Helping People': [
-    'counsel', 'social', 'therap',
-    'health', 'care', 'teacher',
-    'advisor', 'service',
-  ],
-  Creativity: [
-    'design', 'artist', 'writer',
-    'media', 'advertis', 'creative', 'architect',
-  ],
-  Environment: [
-    'environment', 'ecolog', 'conservation',
-    'agricultur', 'forestry', 'wildlife',
-  ],
-  'Problem Solving': [
-    'analyst', 'engineer', 'scientist',
-    'technician', 'research', 'investigator',
-  ],
-  Leadership: [
-    'manager', 'director', 'executive',
-    'supervisor', 'administrator',
-  ],
-  'Working with Data': [
-    'data', 'statistic', 'analyst',
-    'research', 'actuar', 'financial',
-  ],
-  Communication: [
-    'public relations', 'writer', 'reporter',
-    'marketing', 'teacher', 'communications',
-  ],
-  'Working with Children': [
-    'child', 'school', 'teacher',
-    'education', 'pediatric', 'youth',
-  ],
-  Healthcare: [
-    'medical', 'nurs', 'health',
-    'patient', 'physician', 'therap', 'clinical',
-  ],
-  Entrepreneurship: [
-    'business', 'manager', 'marketing',
-    'sales', 'product', 'executive',
-  ],
-};
 
 function categoryMatch(
   title: string,
@@ -92,15 +25,21 @@ function categoryMatch(
   const value = title.toLowerCase();
 
   if (filter === 'creative') {
-    return /design|artist|writer|media|advertis|creative|architect/.test(value);
+    return /design|artist|writer|media|advertis|creative|architect/.test(
+      value
+    );
   }
 
   if (filter === 'business') {
-    return /manager|business|market|sales|financ|account|human resources|executive/.test(value);
+    return /manager|business|market|sales|financ|account|human resources|executive/.test(
+      value
+    );
   }
 
   if (filter === 'tech') {
-    return /software|computer|information technology|data|cyber|network|web/.test(value);
+    return /software|computer|information technology|data|cyber|network|web/.test(
+      value
+    );
   }
 
   return true;
@@ -108,7 +47,6 @@ function categoryMatch(
 
 export default function RecommendationsView() {
   const {
-    userProfile,
     setActiveView,
     setSelectedCareerId,
     compareCareerIds,
@@ -118,12 +56,15 @@ export default function RecommendationsView() {
     isComparing,
   } = useCareer();
 
-  const [catalog, setCatalog] = useState<CatalogCareer[]>([]);
-  const [careers, setCareers] = useState<OnetCareer[]>([]);
-  const [loadingCatalog, setLoadingCatalog] = useState(true);
-  const [loadingDetails, setLoadingDetails] = useState(false);
-  const [error, setError] = useState('');
-  const [reloadKey, setReloadKey] = useState(0);
+  const {
+    catalog,
+    careers,
+    rankedCareers,
+    loadingCatalog,
+    loadingDetails,
+    error,
+    reload,
+  } = useOnetRecommendations();
 
   const [mode, setMode] = useState<'recommended' | 'browse'>(
     'recommended'
@@ -133,208 +74,8 @@ export default function RecommendationsView() {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    setLoadingCatalog(true);
-    setError('');
-    setCatalog([]);
-    setCareers([]);
-
-    fetch('/api/onet/catalog', {
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(
-            'Unable to retrieve the O*NET catalog.'
-          );
-        }
-
-        return response.json();
-      })
-      .then((data) => {
-        if (!controller.signal.aborted) {
-          setCatalog(
-            Array.isArray(data.careers)
-              ? data.careers
-              : []
-          );
-        }
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'Unable to load careers.'
-          );
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoadingCatalog(false);
-        }
-      });
-
-    return () => controller.abort();
-  }, [reloadKey]);
-
-  const candidates = useMemo(() => {
-    const interests = userProfile.interests ?? [];
-    const goals = userProfile.goals ?? [];
-
-    const words = [...interests, ...goals].flatMap(
-      (label) => TOPIC_TERMS[label] ?? []
-    );
-
-    const ranked = catalog
-      .map((career) => {
-        const title = career.title.toLowerCase();
-
-        const hits = words.filter((term) =>
-          title.includes(term)
-        ).length;
-
-        return { career, hits };
-      })
-      .sort(
-        (a, b) =>
-          b.hits - a.hits ||
-          a.career.title.localeCompare(b.career.title)
-      );
-
-    const relevant = ranked
-      .filter(({ hits }) => hits > 0)
-      .map(({ career }) => career);
-
-    const others = ranked
-      .filter(({ hits }) => hits === 0)
-      .map(({ career }) => career);
-
-    const selected: CatalogCareer[] = [];
-    let i = 0;
-
-    while (
-      selected.length < DETAIL_LIMIT &&
-      (i < relevant.length || i < others.length)
-    ) {
-      for (
-        let j = 0;
-        j < 3 &&
-        i * 3 + j < relevant.length &&
-        selected.length < DETAIL_LIMIT;
-        j++
-      ) {
-        selected.push(relevant[i * 3 + j]);
-      }
-
-      if (
-        others[i] &&
-        selected.length < DETAIL_LIMIT
-      ) {
-        selected.push(others[i]);
-      }
-
-      i++;
-    }
-
-    return selected;
-  }, [
-    catalog,
-    userProfile.interests,
-    userProfile.goals,
-  ]);
-
-  const candidateKey = candidates
-    .map((career) => career.id)
-    .join(',');
-
-  useEffect(() => {
-    if (!candidateKey) return;
-
-    const controller = new AbortController();
-
-    setLoadingDetails(true);
-    setCareers([]);
-
-    const ids = candidateKey.split(',');
-
-    async function load() {
-      const loaded: OnetCareer[] = [];
-
-      for (
-        let i = 0;
-        i < ids.length && !controller.signal.aborted;
-        i += 4
-      ) {
-        const batch = await Promise.allSettled(
-          ids.slice(i, i + 4).map(async (id) => {
-            const response = await fetch(
-              `/api/onet/occupation?code=${encodeURIComponent(id)}`,
-              { signal: controller.signal }
-            );
-
-            if (!response.ok) {
-              throw new Error(
-                'Occupation details unavailable'
-              );
-            }
-
-            return (await response.json()) as OnetCareer;
-          })
-        );
-
-        if (controller.signal.aborted) return;
-
-        loaded.push(
-          ...batch
-            .filter(
-              (
-                r
-              ): r is PromiseFulfilledResult<OnetCareer> =>
-                r.status === 'fulfilled'
-            )
-            .map((r) => r.value)
-            .filter(
-              (career) =>
-                career.id && career.title
-            )
-        );
-
-        setCareers([...loaded]);
-      }
-
-      if (!controller.signal.aborted) {
-        setLoadingDetails(false);
-      }
-    }
-
-    void load();
-
-    return () => controller.abort();
-  }, [candidateKey]);
-
-  const rankedCareers = useMemo<RankedCareer[]>(
-    () =>
-      careers
-        .map((career) => ({
-          career,
-          match: calculateOnetMatch(
-            career,
-            userProfile
-          ),
-        }))
-        .sort(
-          (a, b) =>
-            b.match.score - a.match.score
-        ),
-    [careers, userProfile]
-  );
-
   const recommended = rankedCareers.filter(
-    ({ career }) =>
-      categoryMatch(career.title, filter)
+    ({ career }) => categoryMatch(career.title, filter)
   );
 
   const browsing = useMemo(
@@ -479,9 +220,7 @@ export default function RecommendationsView() {
 
             <button
               className="btn-primary"
-              onClick={() =>
-                setReloadKey((n) => n + 1)
-              }
+              onClick={reload}
             >
               <RefreshCw size={16} />
               Retry
@@ -666,48 +405,48 @@ export default function RecommendationsView() {
                               flexWrap: 'wrap',
                             }}
                           >
-                           
-<button
-  className={
-    isSaved(career.id)
-      ? 'btn-primary btn-sm'
-      : 'btn-secondary btn-sm'
-  }
-  onClick={() => toggleSaveCareer(career.id)}
-  aria-pressed={isSaved(career.id)}
-  style={{
-    backgroundColor: isSaved(career.id)
-      ? '#0c6957'
-      : undefined,
-    color: isSaved(career.id)
-      ? '#ffffff'
-      : undefined,
-    borderColor: isSaved(career.id)
-      ? '#0c6957'
-      : undefined,
-    fontWeight: isSaved(career.id)
-      ? 700
-      : 500,
-    transition: 'all 0.2s ease',
-  }}
->
-  {isSaved(career.id) ? (
-    <BookmarkCheck size={14} />
-  ) : (
-    <Bookmark size={14} />
-  )}
-  <span>
-    {isSaved(career.id) ? 'Saved ✓' : 'Save'}
-  </span>
-</button>
-
+                            <button
+                              className={
+                                isSaved(career.id)
+                                  ? 'btn-primary btn-sm'
+                                  : 'btn-secondary btn-sm'
+                              }
+                              onClick={() =>
+                                toggleSaveCareer(career.id)
+                              }
+                              aria-pressed={isSaved(career.id)}
+                              style={{
+                                backgroundColor: isSaved(career.id)
+                                  ? '#0c6957'
+                                  : undefined,
+                                color: isSaved(career.id)
+                                  ? '#ffffff'
+                                  : undefined,
+                                borderColor: isSaved(career.id)
+                                  ? '#0c6957'
+                                  : undefined,
+                                fontWeight: isSaved(career.id)
+                                  ? 700
+                                  : 500,
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              {isSaved(career.id) ? (
+                                <BookmarkCheck size={14} />
+                              ) : (
+                                <Bookmark size={14} />
+                              )}
+                              <span>
+                                {isSaved(career.id)
+                                  ? 'Saved ✓'
+                                  : 'Save'}
+                              </span>
+                            </button>
 
                             <button
                               className="btn-secondary btn-sm"
                               onClick={() =>
-                                toggleCompareCareer(
-                                  career.id
-                                )
+                                toggleCompareCareer(career.id)
                               }
                             >
                               <BarChart3 size={14} />
