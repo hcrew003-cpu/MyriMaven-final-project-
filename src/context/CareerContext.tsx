@@ -352,6 +352,12 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
     const wasSaved = savedCareerIds.includes(id);
     try {
       if (wasSaved) {
+        // Free the comparison slot in Supabase before removing the saved career.
+        // This keeps both lists consistent even after signing out and back in.
+        if (compareCareerIds.includes(id)) {
+          await removeComparedCareer(authUser, id);
+          setCompareCareerIds((prev) => prev.filter((careerId) => careerId !== id));
+        }
         await removeSavedCareer(authUser, id);
         setSavedCareerIds((prev) => prev.filter((careerId) => careerId !== id));
       } else {
