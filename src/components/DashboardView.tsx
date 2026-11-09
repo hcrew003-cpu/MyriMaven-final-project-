@@ -20,6 +20,8 @@ import {
   Lightbulb,
   MessageCircle,
   BriefcaseBusiness,
+  History,
+  Clock3,
 } from 'lucide-react';
 
 const cardStyle: React.CSSProperties = {
@@ -34,6 +36,7 @@ export default function DashboardView() {
     userProfile,
     savedCareerIds,
     compareCareerIds,
+    careerHistory,
     setActiveView,
     setSelectedCareerId,
     openMayaWithPrompt,
@@ -651,6 +654,60 @@ export default function DashboardView() {
             based on available information, not predictions
             of career success.
           </p>
+        </section>
+
+        {/* Recently Viewed Careers */}
+        <section style={{ marginBottom: 36 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <History size={23} style={{ color: 'var(--primary)' }} />
+            <h2 style={{ fontSize: 23, fontWeight: 800, color: 'var(--dark-slate)' }}>
+              Recently Viewed Careers
+            </h2>
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 18 }}>
+            Pick up where you left off, even if you didn't save a career.
+          </p>
+          {careerHistory.length === 0 ? (
+            <div style={cardStyle}>
+              <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
+                You haven't viewed any career profiles yet. Explore the directory to get started.
+              </p>
+              <button type="button" className="btn-primary btn-sm" onClick={() => setActiveView('explore')}>
+                Explore Careers <ArrowRight size={16} />
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 14 }}>
+              {careerHistory.slice(0, 5).map((item) => {
+                const viewedDate = new Date(item.viewed_at);
+                const dateLabel = Number.isNaN(viewedDate.getTime())
+                  ? 'Previously viewed'
+                  : viewedDate.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="card card-hover"
+                    onClick={() => openCareer(item.career_id)}
+                    style={{ ...cardStyle, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+                  >
+                    <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 700, marginBottom: 10 }}>
+                      {/^\d{2}-\d{4}\.\d{2}$/.test(item.career_id) ? 'O*NET Occupation' : 'Career Profile'}
+                    </div>
+                    <h3 style={{ fontSize: 17, fontWeight: 750, color: 'var(--dark-slate)', marginBottom: 10 }}>
+                      {item.career_title}
+                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: 12, marginBottom: 14 }}>
+                      <Clock3 size={14} /> Last viewed {dateLabel}
+                    </div>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontSize: 13, fontWeight: 700 }}>
+                      Reopen Career <ArrowRight size={15} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* Next Steps */}
