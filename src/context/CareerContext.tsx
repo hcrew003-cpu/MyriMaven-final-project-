@@ -61,6 +61,12 @@ interface CareerContextType {
   whatIfPreferences: UserProfile['preferences'];
   updateWhatIfPreference: (key: PreferenceKey, value: number) => void;
   resetWhatIf: () => void;
+  applyWhatIfScenario: (scenario: {
+  preferences: UserProfile['preferences'];
+  priorities: WhatIfState;
+  interests?: string[] | null;
+  skills?: UserProfile['skills'] | null;
+}) => void;
   isMayaOpen: boolean;
   setIsMayaOpen: (open: boolean) => void;
   mayaPrompt: string;
@@ -475,6 +481,37 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
       [key]: clamp(value, 0, 100),
     }));
 
+const applyWhatIfScenario = (scenario: {
+  preferences: UserProfile['preferences'];
+  priorities: WhatIfState;
+  interests?: string[] | null;
+  skills?: UserProfile['skills'] | null;
+}) => {
+  setWhatIfPreferences({
+    ...userProfile.preferences,
+    ...scenario.preferences,
+  });
+
+  setWhatIfToggles({
+    ...EMPTY_PRIORITIES,
+    ...scenario.priorities,
+  });
+
+  setWhatIfInterests(
+    Array.isArray(scenario.interests)
+      ? [...scenario.interests]
+      : [...userProfile.interests]
+  );
+
+  setWhatIfSkills(
+    scenario.skills &&
+    typeof scenario.skills === 'object' &&
+    !Array.isArray(scenario.skills)
+      ? { ...scenario.skills }
+      : { ...userProfile.skills }
+  );
+};
+
   const resetWhatIf = () => {
     setWhatIfToggles({ ...EMPTY_PRIORITIES });
     setWhatIfPreferences({ ...userProfile.preferences });
@@ -514,7 +551,7 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
       userProfile, updateUserProfile, saveProfile,
       whatIfToggles, toggleWhatIf, whatIfInterests, toggleWhatIfInterest,
       whatIfSkills, updateWhatIfSkill, whatIfPreferences,
-      updateWhatIfPreference, resetWhatIf,
+      updateWhatIfPreference, resetWhatIf, applyWhatIfScenario,
       isMayaOpen, setIsMayaOpen, mayaPrompt, openMayaWithPrompt,
       onboardingStep, setOnboardingStep, getWhatIfRankedCareers,
     }}>
