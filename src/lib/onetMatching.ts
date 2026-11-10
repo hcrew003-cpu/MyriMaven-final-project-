@@ -610,7 +610,38 @@ export function calculateOnetMatch(
     }
   }
 
-  const interestScore = average(interestScores);
+  
+  // INTEREST SCORING
+  // Give more importance to the student's strongest
+  // connections while still considering all interests.
+
+  const interestScore = (() => {
+    if (interestScores.length === 0) return null;
+
+    const sortedScores = [...interestScores].sort(
+      (a, b) => b - a
+    );
+
+    // Average the strongest two interest connections.
+    const strongestScores = sortedScores.slice(0, 2);
+
+    const strongestAverage =
+      strongestScores.reduce((sum, score) => sum + score, 0) /
+      strongestScores.length;
+
+    // Keep all selected interests in the calculation.
+    const overallAverage =
+      interestScores.reduce((sum, score) => sum + score, 0) /
+      interestScores.length;
+
+    // Strong connections receive more weight,
+    // but weaker connections still matter.
+    return Math.round(
+      strongestAverage * 0.65 +
+      overallAverage * 0.35
+    );
+  })();
+
 
   // SKILLS
   const skillScores: number[] = [];
