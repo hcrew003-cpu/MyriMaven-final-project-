@@ -4,6 +4,7 @@ import { Career, UserProfile } from '../types/career';
 export const INITIAL_USER_PROFILE: UserProfile = {
   name: '',
   careerStage: '',
+  useCareerBackground: false,
   interests: [],
   skills: {
     Communication: 3,
