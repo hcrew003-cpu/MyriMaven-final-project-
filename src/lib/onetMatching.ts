@@ -581,7 +581,8 @@ export function calculateOnetMatch(
   career: OnetCareer,
   profile: UserProfile,
   scenarioPriorities?: Partial<WhatIfState>,
-  scenarioPreferences?: Preferences
+  scenarioPreferences?: Preferences,
+  scenarioProfile?: Pick<UserProfile, 'interests' | 'skills'>
 ): OnetMatchResult {
   const sections = getOccupationSections(career);
 
@@ -592,7 +593,7 @@ export function calculateOnetMatch(
   // INTERESTS
   const interestScores: number[] = [];
 
-  for (const interest of profile.interests ?? []) {
+  for (const interest of (scenarioProfile?.interests ?? profile.interests) ?? []) {
     const terms = INTEREST_TERMS[interest] ?? [
       normalize(interest),
     ];
@@ -615,7 +616,7 @@ export function calculateOnetMatch(
   const skillScores: number[] = [];
 
   for (const [skillName, rawRating] of Object.entries(
-    profile.skills ?? {}
+    scenarioProfile?.skills ?? profile.skills ?? {}
   )) {
     if (typeof rawRating !== 'number') continue;
 
