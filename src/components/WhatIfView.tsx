@@ -6,6 +6,7 @@ import { useCareer } from '../context/CareerContext';
 import type { OnetCareer } from '../context/CareerContext';
 import type { WhatIfState, UserProfile } from '../types/career';
 import { calculateOnetMatch } from '../lib/onetMatching';
+import { ALL_INTERESTS, ALL_SKILLS } from '../data/careersData';
 import {
   loadWhatIfScenarios,
   saveWhatIfScenario,
@@ -239,6 +240,10 @@ export default function WhatIfView() {
     authUser,
     userProfile,
     whatIfToggles,
+    whatIfInterests,
+    toggleWhatIfInterest,
+    whatIfSkills,
+    updateWhatIfSkill,
     toggleWhatIf,
     whatIfPreferences,
     updateWhatIfPreference,
@@ -359,9 +364,22 @@ export default function WhatIfView() {
       userProfile.preferences[key]
   );
 
+  const changedInterests =
+    [...whatIfInterests].sort().join('|') !== [...userProfile.interests].sort().join('|');
+  const changedSkills = ALL_SKILLS.filter(({ label }) =>
+    (whatIfSkills[label] ?? 3) !== (userProfile.skills[label] ?? 3)
+  ).length;
+
+  const scenarioProfile = useMemo(() => ({
+    ...userProfile,
+    interests: whatIfInterests,
+    skills: whatIfSkills,
+  }), [userProfile, whatIfInterests, whatIfSkills]);
+
   const isBaseline =
     activePriorities.length === 0 &&
-    changedPreferences.length === 0;
+    changedPreferences.length === 0 &&
+    !changedInterests && changedSkills === 0;
 
   // Load the same complete O*NET catalog used by Recommendations.
   useEffect(() => {
@@ -412,8 +430,8 @@ export default function WhatIfView() {
   // Use the saved profile to choose candidates.
   // Temporary What-If changes do not alter this candidate pool.
   const candidates = useMemo(
-    () => selectCandidates(catalog, userProfile),
-    [catalog, userProfile]
+    () => selectCandidates(catalog, scenarioProfile),
+    [catalog, scenarioProfile]
   );
 
   const candidateKey = candidates
@@ -519,7 +537,8 @@ const scenario = calculateOnetMatch(
   career,
   userProfile,
   whatIfToggles,
-  whatIfPreferences
+  whatIfPreferences,
+  scenarioProfile
 );
 
 
@@ -540,6 +559,7 @@ const scenario = calculateOnetMatch(
   userProfile,
   whatIfToggles,
   whatIfPreferences,
+  scenarioProfile,
 ]);
 
 
@@ -640,6 +660,41 @@ const scenario = calculateOnetMatch(
                 <strong>Adjust your scenario</strong>
                 <p>Change settings while viewing your career results.</p>
               </div>
+              <section className="card" style={{ padding: 20, marginBottom: 20 }}>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: 8 }}>Explore interests</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '.85rem', marginBottom: 12 }}>
+                  Select or remove interests to explore different careers.
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {ALL_INTERESTS.map(({ label }) => (
+                    <button key={label} type="button"
+                      className={`toggle-chip ${whatIfInterests.includes(label) ? 'active' : ''}`}
+                      aria-pressed={whatIfInterests.includes(label)}
+                      onClick={() => toggleWhatIfInterest(label)}>
+                      {whatIfInterests.includes(label) ? '✓ ' : '+ '}{label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <section className="card" style={{ padding: 20, marginBottom: 20 }}>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: 8 }}>Adjust your skills</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '.85rem', marginBottom: 12 }}>
+                  Try different self-rated skill levels from 1 to 5.
+                </p>
+                <div style={{ display: 'grid', gap: 14 }}>
+                  {ALL_SKILLS.map(({ label }) => (
+                    <div key={label}>
+                      <label htmlFor={`what-if-skill-${label}`} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '.9rem' }}>
+                        <span>{label}</span><span>{whatIfSkills[label] ?? 3}/5</span>
+                      </label>
+                      <input id={`what-if-skill-${label}`} type="range" min={1} max={5} step={1}
+                        value={whatIfSkills[label] ?? 3}
+                        onChange={(event) => updateWhatIfSkill(label, Number(event.target.value))}
+                        style={{ width: '100%', accentColor: 'var(--primary)' }} />
+                    </div>
+                  ))}
+                </div>
+              </section>
         <div
           className="card"
           style={{
@@ -825,7 +880,7 @@ Work location is estimated only when duties provide clear on-site evidence; remo
             My Saved What-If Profiles
           </h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: 18 }}>
-            Save your current sliders and priorities as a named scenario. Loading one will not overwrite your onboarding profile.
+            Save your work preferences and priorities as a named scenario. Interest and skill changes are not yet included in saved scenarios. Loading one will not overwrite your onboarding profile.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
             <input
@@ -915,7 +970,7 @@ Work location is estimated only when duties provide clear on-site evidence; remo
                   ? `Baseline scenario: ${
                       top?.career.title ?? 'No occupation'
                     } currently ranks highest among the evaluated occupations.`
-                  : `${activePriorities.length} priorities selected and ${changedPreferences.length} work preferences adjusted. Among the evaluated occupations, ${improved} estimates increased and ${decreased} decreased. ${
+                  : `${changedInterests ? 'Interests changed; ' : ''}${changedSkills} skills adjusted, ${activePriorities.length} priorities selected and ${changedPreferences.length} work preferences adjusted. Among the evaluated occupations, ${improved} estimates increased and ${decreased} decreased. ${
                       top?.career.title ?? 'No occupation'
                     } currently ranks highest.`}
           </p>
