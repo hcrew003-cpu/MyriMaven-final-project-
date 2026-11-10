@@ -8,7 +8,7 @@ export type CatalogCareer = {
   jobZone: string | null;
 };
 
-export const DETAIL_LIMIT = 36;
+export const DETAIL_LIMIT = 60;
 
 
 const TOPIC_TERMS: Record<string, string[]> = {
