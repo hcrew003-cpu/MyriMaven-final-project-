@@ -633,6 +633,13 @@ const scenario = calculateOnetMatch(
           </div>
         ) : null}
 
+        <div className="what-if-layout">
+          <aside className="what-if-sidebar" aria-label="What-If scenario controls">
+            <div className="what-if-sidebar-inner">
+              <div className="what-if-sidebar-heading">
+                <strong>Adjust your scenario</strong>
+                <p>Change settings while viewing your career results.</p>
+              </div>
         <div
           className="card"
           style={{
@@ -875,6 +882,9 @@ Work location is estimated only when duties provide clear on-site evidence; remo
           )}
         </section>
 
+            </div>
+          </aside>
+          <main className="what-if-results">
         <div
           className="card"
           style={{
@@ -1236,7 +1246,34 @@ Work location is estimated only when duties provide clear on-site evidence; remo
               for this scenario.
             </div>
           )}
+          </main>
+        </div>
       </div>
+      <style jsx>{`
+        .what-if-layout {
+          display: grid;
+          grid-template-columns: minmax(290px, 350px) minmax(0, 1fr);
+          align-items: start;
+          gap: 24px;
+        }
+        .what-if-sidebar { min-width: 0; position: sticky; top: 20px; }
+        .what-if-sidebar-inner {
+          max-height: calc(100vh - 40px);
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          padding-right: 6px;
+          scrollbar-width: thin;
+        }
+        .what-if-sidebar-heading { margin: 0 0 16px; }
+        .what-if-sidebar-heading strong { color: var(--dark-slate); font-size: 1.1rem; }
+        .what-if-sidebar-heading p { color: var(--text-muted); font-size: .88rem; margin-top: 5px; }
+        .what-if-results { min-width: 0; }
+        @media (max-width: 900px) {
+          .what-if-layout { grid-template-columns: minmax(0, 1fr); }
+          .what-if-sidebar { position: static; }
+          .what-if-sidebar-inner { max-height: none; overflow: visible; padding-right: 0; }
+        }
+      `}</style>
     </div>
   );
 }
