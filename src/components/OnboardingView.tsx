@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCareer } from '../context/CareerContext';
 import {
   ALL_INTERESTS,
@@ -201,6 +201,27 @@ export default function OnboardingView() {
   const [editingSection, setEditingSection] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  // UI preference until the profile model and recommendation engine are connected.
+  const [useCareerBackground, setUseCareerBackground] = useState(false);
+
+  useEffect(() => {
+    try {
+      setUseCareerBackground(
+        window.localStorage.getItem('careerSandboxUseBackground') === 'true'
+      );
+    } catch {
+      // Storage may be unavailable in private browsing.
+    }
+  }, []);
+
+  const handleBackgroundChoice = (checked: boolean) => {
+    setUseCareerBackground(checked);
+    try {
+      window.localStorage.setItem('careerSandboxUseBackground', String(checked));
+    } catch {
+      // The choice still works for the current session.
+    }
+  };
 
   const handleGenerateRecommendations = async () => {
     if (isSaving) return;
@@ -309,14 +330,6 @@ export default function OnboardingView() {
 
   const stage = userProfile.careerStage;
 
-  const backgroundComplete =
-    stage === 'College / University'
-      ? Boolean(userProfile.major?.trim())
-      : stage === 'Recent graduate'
-      ? Boolean(userProfile.completedDegree?.trim())
-      : stage === 'Career switcher'
-      ? Boolean(userProfile.currentCareer?.trim())
-      : true;
 
   return (
     <div
@@ -404,11 +417,10 @@ export default function OnboardingView() {
                 marginBottom: '32px',
               }}
             >
-              Share what you enjoy, what you're good at,
-              and what matters to you. We'll also learn
-              a little about your education or career
-              background to make your exploration more
-              relevant.
+              Your interests, skills, work preferences, and goals
+              will always guide your career recommendations.
+              You can also share your education or career background,
+              but it's completely optional.
             </p>
 
             <div style={{ marginBottom: '28px' }}>
@@ -509,16 +521,16 @@ export default function OnboardingView() {
                     marginBottom: '20px',
                   }}
                 >
-                  We'll explore careers connected to your
-                  studies, along with other possibilities
-                  that match your interests.
+                  You can share your studies if you'd like.
+                  They will only influence recommendations
+                  when you choose to include your background.
                 </p>
 
                 <label
                   htmlFor="profile-major"
                   style={labelStyle}
                 >
-                  Current major or program
+                  Current major or program (optional)
                 </label>
 
                 <input
@@ -579,16 +591,16 @@ export default function OnboardingView() {
                     marginBottom: '20px',
                   }}
                 >
-                  Your education can help us identify
-                  relevant opportunities without limiting
-                  you to one career path.
+                  Sharing your education is optional.
+                  It will only influence recommendations
+                  if you choose to include your background.
                 </p>
 
                 <label
                   htmlFor="profile-degree"
                   style={labelStyle}
                 >
-                  Completed degree or diploma
+                  Completed degree or diploma (optional)
                 </label>
 
                 <input
@@ -626,16 +638,16 @@ export default function OnboardingView() {
                     marginBottom: '20px',
                   }}
                 >
-                  We'll consider your existing experience
-                  while helping you discover different
-                  career possibilities.
+                  Sharing your experience is optional.
+                  It will only influence recommendations
+                  if you choose to include your background.
                 </p>
 
                 <label
                   htmlFor="profile-career"
                   style={labelStyle}
                 >
-                  Current or most recent career
+                  Current or most recent career (optional)
                 </label>
 
                 <input
@@ -678,6 +690,46 @@ export default function OnboardingView() {
               </div>
             )}
 
+            {/* Optional background influence — core matching is always active. */}
+            <div
+              style={{
+                padding: '22px',
+                border: '1px solid var(--border-strong)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: '28px',
+                backgroundColor: 'var(--bg-subtle)',
+              }}
+            >
+              <label
+                htmlFor="use-career-background"
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  color: 'var(--dark-slate)',
+                }}
+              >
+                <input
+                  id="use-career-background"
+                  type="checkbox"
+                  checked={useCareerBackground}
+                  onChange={(e) => handleBackgroundChoice(e.target.checked)}
+                  style={{ marginTop: '4px', width: '18px', height: '18px' }}
+                />
+                <span>Also consider my career background</span>
+              </label>
+              <p style={{ ...mutedStyle, marginTop: '12px' }}>
+                {useCareerBackground
+                  ? 'You have chosen to include your education or work experience as additional context. Your interests, skills, preferences, and goals will still be the main factors, and careers outside your background can still appear.'
+                  : 'Your career background will not influence recommendations. Your interests, skills, preferences, and goals will always guide your results.'}
+              </p>
+              <p style={{ ...mutedStyle, fontSize: '0.85rem', marginTop: '8px' }}>
+                This choice is optional and can be changed later.
+              </p>
+            </div>
+
             <div
               style={{
                 display: 'flex',
@@ -686,11 +738,9 @@ export default function OnboardingView() {
             >
               <button
                 onClick={() => next(2)}
-                disabled={!backgroundComplete}
                 className="btn-primary"
                 style={{
                   padding: '14px 28px',
-                  opacity: backgroundComplete ? 1 : 0.6,
                 }}
               >
                 <span>
@@ -1415,6 +1465,10 @@ export default function OnboardingView() {
 
                 <p style={mutedStyle}>
                   {stage || 'Not selected'}
+                </p>
+
+                <p style={{ ...mutedStyle, marginTop: '10px', fontWeight: 700 }}>
+                  Include background in career suggestions: {useCareerBackground ? 'Yes' : 'No'}
                 </p>
 
                 {stage === 'College / University' && (
