@@ -248,6 +248,7 @@ export default function WhatIfView() {
     whatIfPreferences,
     updateWhatIfPreference,
     resetWhatIf,
+    applyWhatIfScenario,
     setSelectedCareerId,
     setActiveView,
     toggleSaveCareer,
@@ -304,7 +305,13 @@ export default function WhatIfView() {
     setScenarioError('');
     setScenarioMessage('');
     try {
-      const saved = await saveWhatIfScenario(scenarioName, whatIfPreferences, whatIfToggles);
+      const saved = await saveWhatIfScenario(
+  scenarioName,
+  whatIfPreferences,
+  whatIfToggles,
+  whatIfInterests,
+  whatIfSkills
+);
       setSavedScenarios((prev) => [saved, ...prev]);
       setScenarioName('');
       setScenarioMessage(`Saved “${saved.name}”. Your original profile was not changed.`);
@@ -315,21 +322,18 @@ export default function WhatIfView() {
     }
   };
 
-  const handleLoadScenario = (scenario: SavedWhatIfScenario) => {
-    for (const { key } of preferences) {
-      const value = scenario.preferences[key];
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        updateWhatIfPreference(key, value);
-      }
-    }
-    for (const { key } of priorities) {
-      if (Boolean(whatIfToggles[key]) !== Boolean(scenario.priorities[key])) {
-        toggleWhatIf(key);
-      }
-    }
-    setScenarioError('');
-    setScenarioMessage(`Loaded “${scenario.name}”. Your career estimates will update.`);
-  };
+  
+const handleLoadScenario = (
+  scenario: SavedWhatIfScenario
+) => {
+  applyWhatIfScenario(scenario);
+
+  setScenarioError('');
+  setScenarioMessage(
+    `Loaded “${scenario.name}”. Your career estimates will update.`
+  );
+};
+
 
   const handleDeleteScenario = async (scenario: SavedWhatIfScenario) => {
     if (!window.confirm(`Delete “${scenario.name}”? This cannot be undone.`)) return;
@@ -883,9 +887,9 @@ Work location is estimated only when duties provide clear on-site evidence; remo
           <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: 8 }}>
             My Saved What-If Profiles
           </h2>
-          <p style={{ color: 'var(--text-muted)', marginBottom: 18 }}>
-            Save your work preferences and priorities as a named scenario. Interest and skill changes are not yet included in saved scenarios. Loading one will not overwrite your onboarding profile.
-          </p>
+         <p style={{ color: 'var(--text-muted)', marginBottom: 18 }}>
+  Save your interests, skill ratings, work preferences and priorities as a named scenario. Loading one will not overwrite your onboarding profile. Older saved scenarios use your original interests and skills.
+</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
             <input
               type="text"
