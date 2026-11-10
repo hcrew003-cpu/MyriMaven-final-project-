@@ -1174,15 +1174,13 @@ Work location is estimated only when duties provide clear on-site evidence; remo
                     </div>
                   )}
 
-                  <div className="tags-row">
-                    <span className="badge-tag">
-                      Evidence: {item.confidence}
-                    </span>
+                  
+<div className="tags-row">
+  <span className="badge-tag">
+    O*NET {career.id}
+  </span>
+</div>
 
-                    <span className="badge-tag">
-                      O*NET {career.id}
-                    </span>
-                  </div>
                 </div>
 
                
