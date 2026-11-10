@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useCareer } from '../context/CareerContext';
 import {
   ALL_INTERESTS,
@@ -201,28 +201,6 @@ export default function OnboardingView() {
   const [editingSection, setEditingSection] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
-  // UI preference until the profile model and recommendation engine are connected.
-  const [useCareerBackground, setUseCareerBackground] = useState(false);
-
-  useEffect(() => {
-    try {
-      setUseCareerBackground(
-        window.localStorage.getItem('careerSandboxUseBackground') === 'true'
-      );
-    } catch {
-      // Storage may be unavailable in private browsing.
-    }
-  }, []);
-
-  const handleBackgroundChoice = (checked: boolean) => {
-    setUseCareerBackground(checked);
-    try {
-      window.localStorage.setItem('careerSandboxUseBackground', String(checked));
-    } catch {
-      // The choice still works for the current session.
-    }
-  };
-
   const handleGenerateRecommendations = async () => {
     if (isSaving) return;
 
@@ -714,14 +692,14 @@ export default function OnboardingView() {
                 <input
                   id="use-career-background"
                   type="checkbox"
-                  checked={useCareerBackground}
-                  onChange={(e) => handleBackgroundChoice(e.target.checked)}
+                  checked={userProfile.useCareerBackground ?? false}
+                  onChange={(e) => updateUserProfile({ useCareerBackground: e.target.checked })}
                   style={{ marginTop: '4px', width: '18px', height: '18px' }}
                 />
                 <span>Also consider my career background</span>
               </label>
               <p style={{ ...mutedStyle, marginTop: '12px' }}>
-                {useCareerBackground
+                {userProfile.useCareerBackground
                   ? 'You have chosen to include your education or work experience as additional context. Your interests, skills, preferences, and goals will still be the main factors, and careers outside your background can still appear.'
                   : 'Your career background will not influence recommendations. Your interests, skills, preferences, and goals will always guide your results.'}
               </p>
@@ -1468,7 +1446,7 @@ export default function OnboardingView() {
                 </p>
 
                 <p style={{ ...mutedStyle, marginTop: '10px', fontWeight: 700 }}>
-                  Include background in career suggestions: {useCareerBackground ? 'Yes' : 'No'}
+                  Include background in career suggestions: {userProfile.useCareerBackground ? 'Yes' : 'No'}
                 </p>
 
                 {stage === 'College / University' && (
