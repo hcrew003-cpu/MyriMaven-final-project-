@@ -281,94 +281,133 @@ function getBackgroundTerms(profile: UserProfile): string[] {
   return [...terms];
 }
 
+/**
+ * Build a balanced discovery shortlist before the detailed O*NET matching step.
+ * These scores choose which occupations to inspect; they are NOT match percentages.
+ */
 export function selectOnetCandidates(
   catalog: CatalogCareer[],
   profile: UserProfile
 ): CatalogCareer[] {
-  const interests = profile.interests ?? [];
-  const goals = profile.goals ?? [];
+  if (catalog.length === 0) return [];
 
-  const interestTerms = [
-    ...new Set(
-      interests.flatMap((label) => TOPIC_TERMS[label] ?? [])
-    ),
-  ];
-
-  const goalTerms = [
-    ...new Set(
-      goals.flatMap((label) => TOPIC_TERMS[label] ?? [])
-    ),
-  ];
-
+  const interests = [...new Set(profile.interests ?? [])].filter(
+    (label) => (TOPIC_TERMS[label]?.length ?? 0) > 0
+  );
+  const goals = [...new Set(profile.goals ?? [])];
+  const goalTerms = [...new Set(goals.flatMap((label) => TOPIC_TERMS[label] ?? []))];
   const backgroundTerms = getBackgroundTerms(profile);
 
-  const ranked = catalog
-    .map((career) => {
-      const title = career.title.toLowerCase();
-
-      const interestHits = interestTerms.filter((term) =>
-        title.includes(term)
-      ).length;
-
-      const goalHits = goalTerms.filter((term) =>
-        title.includes(term)
-      ).length;
-
-      const backgroundHits = backgroundTerms.filter((term) =>
-        title.includes(term)
-      ).length;
-
-      // Interests remain the strongest discovery signal.
-      // Background is only a small ranking influence.
-      const score =
-        interestHits * 3 +
-        goalHits * 2 +
-        Math.min(backgroundHits, 3) * 0.4;
-
-      return {
-        career,
-        score,
-        coreHits: interestHits + goalHits,
-      };
-    })
-    .sort(
-      (a, b) =>
-        b.score - a.score ||
-        a.career.title.localeCompare(b.career.title)
+  const scored = catalog.map((career) => {
+    const title = career.title.toLowerCase();
+    const interestHits = interests.map((label) =>
+      (TOPIC_TERMS[label] ?? []).filter((term) => title.includes(term)).length
     );
+    const goalHits = goalTerms.filter((term) => title.includes(term)).length;
+    const backgroundHits = backgroundTerms.filter((term) => title.includes(term)).length;
+    const matchingInterests = interestHits.filter((hits) => hits > 0).length;
 
-  // Prioritize careers supported by core interests/goals.
-  const relevant = ranked
-    .filter(({ coreHits }) => coreHits > 0)
-    .map(({ career }) => career);
+    // Reward alignment with more than one selected interest, not just many
+    // overlapping words from one broad category such as Leadership.
+    const score =
+      matchingInterests * 4 +
+      interestHits.reduce((sum, hits) => sum + Math.min(hits, 2), 0) +
+      Math.min(goalHits, 2) * 1.5 +
+      Math.min(backgroundHits, 3) * 0.4;
 
-  // Keep exploration opportunities outside those interests.
-  const others = ranked
-    .filter(({ coreHits }) => coreHits === 0)
-    .map(({ career }) => career);
+    return { career, score, interestHits, matchingInterests, goalHits };
+  });
+
+  const byScore = (a: (typeof scored)[number], b: (typeof scored)[number]) =>
+    b.score - a.score || a.career.title.localeCompare(b.career.title);
 
   const selected: CatalogCareer[] = [];
-  let i = 0;
+  const selectedIds = new Set<string>();
+  const familyCounts = new Map<string, number>();
 
-  while (
-    selected.length < DETAIL_LIMIT &&
-    (i * 3 < relevant.length || i < others.length)
-  ) {
-    for (
-      let j = 0;
-      j < 3 &&
-      i * 3 + j < relevant.length &&
-      selected.length < DETAIL_LIMIT;
-      j++
-    ) {
-      selected.push(relevant[i * 3 + j]);
+  // Prevent one title family (e.g. many kinds of supervisors) from
+  // filling the shortlist. This is a soft limit, relaxed if needed.
+  const familyOf = (title: string) =>
+    title.toLowerCase().replace(/[^a-z ]/g, ' ').trim().split(/\s+/).slice(0, 2).join(' ');
+
+  const add = (item: (typeof scored)[number], enforceFamily = true) => {
+    const id = item.career.id;
+    const family = familyOf(item.career.title);
+    if (selectedIds.has(id) || selected.length >= DETAIL_LIMIT) return false;
+    if (enforceFamily && (familyCounts.get(family) ?? 0) >= 2) return false;
+    selected.push(item.career);
+    selectedIds.add(id);
+    familyCounts.set(family, (familyCounts.get(family) ?? 0) + 1);
+    return true;
+  };
+
+  // Reserve a small portion for exploration beyond the selected topics.
+  const explorationSlots = Math.min(6, Math.floor(DETAIL_LIMIT / 6));
+  const mainLimit = Math.min(catalog.length, DETAIL_LIMIT - explorationSlots);
+
+  // Round-robin across the user's selected interests instead of allowing
+  // the broadest keyword list to dominate the entire candidate shortlist.
+  const pools = interests.map((_, index) =>
+    scored.filter((item) => item.interestHits[index] > 0).sort(byScore)
+  );
+  const offsets = pools.map(() => 0);
+  let progressed = true;
+  while (selected.length < mainLimit && progressed) {
+    progressed = false;
+    for (let i = 0; i < pools.length && selected.length < mainLimit; i++) {
+      while (offsets[i] < pools[i].length) {
+        const item = pools[i][offsets[i]++];
+        if (add(item)) {
+          progressed = true;
+          break;
+        }
+      }
     }
+  }
 
-    if (others[i] && selected.length < DETAIL_LIMIT) {
-      selected.push(others[i]);
+  // Fill remaining main slots with strong cross-interest or goal matches.
+  const coreMatches = scored
+    .filter((item) => item.matchingInterests > 0 || item.goalHits > 0)
+    .sort(byScore);
+  for (const item of coreMatches) {
+    if (selected.length >= mainLimit) break;
+    add(item);
+  }
+
+  // Exploratory occupations: distribute across other topic areas rather
+  // than taking the first alphabetically named occupations in O*NET.
+  const otherTopics = Object.keys(TOPIC_TERMS).filter(
+    (label) => !interests.includes(label)
+  );
+  const exploratoryPools = otherTopics.map((label) =>
+    scored
+      .filter((item) =>
+        (TOPIC_TERMS[label] ?? []).some((term) =>
+          item.career.title.toLowerCase().includes(term)
+        )
+      )
+      .sort(byScore)
+  );
+  const explorationStart = selected.length;
+  let round = 0;
+  while (selected.length < Math.min(DETAIL_LIMIT, explorationStart + explorationSlots)) {
+    let addedInRound = false;
+    for (const pool of exploratoryPools) {
+      if (selected.length >= Math.min(DETAIL_LIMIT, explorationStart + explorationSlots)) break;
+      if (pool[round] && add(pool[round])) addedInRound = true;
     }
+    round++;
+    if (!addedInRound && round > Math.max(0, ...exploratoryPools.map((p) => p.length))) break;
+  }
 
-    i++;
+  // Always fill the available detail budget, even for sparse profiles.
+  for (const item of [...scored].sort(byScore)) {
+    if (selected.length >= Math.min(DETAIL_LIMIT, catalog.length)) break;
+    add(item);
+  }
+  for (const item of [...scored].sort(byScore)) {
+    if (selected.length >= Math.min(DETAIL_LIMIT, catalog.length)) break;
+    add(item, false);
   }
 
   return selected;
