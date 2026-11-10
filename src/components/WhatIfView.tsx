@@ -659,42 +659,16 @@ const scenario = calculateOnetMatch(
               <div className="what-if-sidebar-heading">
                 <strong>Adjust your scenario</strong>
                 <p>Change settings while viewing your career results.</p>
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  onClick={resetWhatIf}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 12 }}
+                >
+                  <RefreshCw size={14} />
+                  Reset Scenario
+                </button>
               </div>
-              <section className="card" style={{ padding: 20, marginBottom: 20 }}>
-                <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: 8 }}>Explore interests</h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: '.85rem', marginBottom: 12 }}>
-                  Select or remove interests to explore different careers.
-                </p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {ALL_INTERESTS.map(({ label }) => (
-                    <button key={label} type="button"
-                      className={`toggle-chip ${whatIfInterests.includes(label) ? 'active' : ''}`}
-                      aria-pressed={whatIfInterests.includes(label)}
-                      onClick={() => toggleWhatIfInterest(label)}>
-                      {whatIfInterests.includes(label) ? '✓ ' : '+ '}{label}
-                    </button>
-                  ))}
-                </div>
-              </section>
-              <section className="card" style={{ padding: 20, marginBottom: 20 }}>
-                <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: 8 }}>Adjust your skills</h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: '.85rem', marginBottom: 12 }}>
-                  Try different self-rated skill levels from 1 to 5.
-                </p>
-                <div style={{ display: 'grid', gap: 14 }}>
-                  {ALL_SKILLS.map(({ label }) => (
-                    <div key={label}>
-                      <label htmlFor={`what-if-skill-${label}`} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '.9rem' }}>
-                        <span>{label}</span><span>{whatIfSkills[label] ?? 3}/5</span>
-                      </label>
-                      <input id={`what-if-skill-${label}`} type="range" min={1} max={5} step={1}
-                        value={whatIfSkills[label] ?? 3}
-                        onChange={(event) => updateWhatIfSkill(label, Number(event.target.value))}
-                        style={{ width: '100%', accentColor: 'var(--primary)' }} />
-                    </div>
-                  ))}
-                </div>
-              </section>
         <div
           className="card"
           style={{
@@ -716,13 +690,7 @@ const scenario = calculateOnetMatch(
               Try different career priorities
             </strong>
 
-            <button
-              className="btn-secondary btn-sm"
-              onClick={resetWhatIf}
-            >
-              <RefreshCw size={14} />
-              Reset scenario
-            </button>
+
           </div>
 
           <div
@@ -764,6 +732,42 @@ const scenario = calculateOnetMatch(
           </p>
         </div>
 
+
+              <section className="card" style={{ padding: 20, marginBottom: 20 }}>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: 8 }}>Explore interests</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '.85rem', marginBottom: 12 }}>
+                  Select or remove interests to explore different careers.
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {ALL_INTERESTS.map(({ label }) => (
+                    <button key={label} type="button"
+                      className={`toggle-chip ${whatIfInterests.includes(label) ? 'active' : ''}`}
+                      aria-pressed={whatIfInterests.includes(label)}
+                      onClick={() => toggleWhatIfInterest(label)}>
+                      {whatIfInterests.includes(label) ? '✓ ' : '+ '}{label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <section className="card" style={{ padding: 20, marginBottom: 20 }}>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: 8 }}>Adjust your skills</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '.85rem', marginBottom: 12 }}>
+                  Try different self-rated skill levels from 1 to 5.
+                </p>
+                <div style={{ display: 'grid', gap: 14 }}>
+                  {ALL_SKILLS.map(({ label }) => (
+                    <div key={label}>
+                      <label htmlFor={`what-if-skill-${label}`} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '.9rem' }}>
+                        <span>{label}</span><span>{whatIfSkills[label] ?? 3}/5</span>
+                      </label>
+                      <input id={`what-if-skill-${label}`} type="range" min={1} max={5} step={1}
+                        value={whatIfSkills[label] ?? 3}
+                        onChange={(event) => updateWhatIfSkill(label, Number(event.target.value))}
+                        style={{ width: '100%', accentColor: 'var(--primary)' }} />
+                    </div>
+                  ))}
+                </div>
+              </section>
         <div
           className="card"
           style={{
