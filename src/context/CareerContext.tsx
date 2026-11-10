@@ -54,6 +54,10 @@ interface CareerContextType {
   saveProfile: () => Promise<void>;
   whatIfToggles: WhatIfState;
   toggleWhatIf: (key: keyof WhatIfState) => void;
+  whatIfInterests: string[];
+  toggleWhatIfInterest: (interest: string) => void;
+  whatIfSkills: UserProfile['skills'];
+  updateWhatIfSkill: (skill: string, rating: number) => void;
   whatIfPreferences: UserProfile['preferences'];
   updateWhatIfPreference: (key: PreferenceKey, value: number) => void;
   resetWhatIf: () => void;
@@ -303,6 +307,8 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
   const [profileLoading, setProfileLoading] = useState(false);
   const [whatIfToggles, setWhatIfToggles] = useState<WhatIfState>({ ...EMPTY_PRIORITIES });
+  const [whatIfInterests, setWhatIfInterests] = useState<string[]>([]);
+  const [whatIfSkills, setWhatIfSkills] = useState<UserProfile['skills']>({});
   const [whatIfPreferences, setWhatIfPreferences] = useState<UserProfile['preferences']>({ ...INITIAL_USER_PROFILE.preferences });
   const [isMayaOpen, setIsMayaOpen] = useState(false);
   const [mayaPrompt, setMayaPrompt] = useState('');
@@ -391,8 +397,10 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
   // Scenario sliders start with the saved profile but never write to Supabase.
   useEffect(() => {
     setWhatIfPreferences({ ...userProfile.preferences });
+    setWhatIfInterests([...userProfile.interests]);
+    setWhatIfSkills({ ...userProfile.skills });
     setWhatIfToggles({ ...EMPTY_PRIORITIES });
-  }, [userProfile.preferences]);
+  }, [userProfile.preferences, userProfile.interests, userProfile.skills]);
 
   const selectedCareer = CAREERS.find((c) => c.id === selectedCareerId) || CAREERS[0];
 
@@ -453,6 +461,14 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
   const toggleWhatIf = (key: keyof WhatIfState) =>
     setWhatIfToggles((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  const toggleWhatIfInterest = (interest: string) =>
+    setWhatIfInterests((prev) => prev.includes(interest)
+      ? prev.filter((item) => item !== interest)
+      : [...prev, interest]);
+
+  const updateWhatIfSkill = (skill: string, rating: number) =>
+    setWhatIfSkills((prev) => ({ ...prev, [skill]: clamp(rating, 1, 5) }));
+
   const updateWhatIfPreference = (key: PreferenceKey, value: number) =>
     setWhatIfPreferences((prev) => ({
       ...prev,
@@ -462,6 +478,8 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
   const resetWhatIf = () => {
     setWhatIfToggles({ ...EMPTY_PRIORITIES });
     setWhatIfPreferences({ ...userProfile.preferences });
+    setWhatIfInterests([...userProfile.interests]);
+    setWhatIfSkills({ ...userProfile.skills });
   };
 
   const openMayaWithPrompt = (prompt: string) => {
@@ -494,7 +512,8 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
       savedCareerIds, toggleSaveCareer, isSaved,
       compareCareerIds, toggleCompareCareer, isComparing,
       userProfile, updateUserProfile, saveProfile,
-      whatIfToggles, toggleWhatIf, whatIfPreferences,
+      whatIfToggles, toggleWhatIf, whatIfInterests, toggleWhatIfInterest,
+      whatIfSkills, updateWhatIfSkill, whatIfPreferences,
       updateWhatIfPreference, resetWhatIf,
       isMayaOpen, setIsMayaOpen, mayaPrompt, openMayaWithPrompt,
       onboardingStep, setOnboardingStep, getWhatIfRankedCareers,
