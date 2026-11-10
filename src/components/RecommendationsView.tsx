@@ -386,15 +386,13 @@ export default function RecommendationsView() {
                                 : 'Review tasks and education requirements before deciding.')}
                           </div>
 
-                          <div className="tags-row">
-                            <span className="badge-tag">
-                              Evidence: {match.confidence}
-                            </span>
+                          
+<div className="tags-row">
+  <span className="badge-tag">
+    O*NET {career.id}
+  </span>
+</div>
 
-                            <span className="badge-tag">
-                              O*NET {career.id}
-                            </span>
-                          </div>
                         </div>
 
                         <div className="card-actions">
