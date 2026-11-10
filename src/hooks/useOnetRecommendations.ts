@@ -125,10 +125,21 @@ export function useOnetRecommendations() {
     };
   }, [reloadKey]);
 
-  const candidates = useMemo(
-    () => selectOnetCandidates(catalog, userProfile),
-    [catalog, userProfile.interests, userProfile.goals]
-  );
+ 
+const candidates = useMemo(
+  () => selectOnetCandidates(catalog, userProfile),
+  [
+    catalog,
+    userProfile.interests,
+    userProfile.goals,
+    userProfile.useCareerBackground,
+    userProfile.major,
+    userProfile.minor,
+    userProfile.completedDegree,
+    userProfile.currentCareer,
+  ]
+);
+
 
   const candidateKey = candidates
     .map((career) => career.id)
