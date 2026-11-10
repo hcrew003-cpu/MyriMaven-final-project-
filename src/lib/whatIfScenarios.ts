@@ -8,17 +8,30 @@ export interface SavedWhatIfScenario {
   name: string;
   preferences: UserProfile['preferences'];
   priorities: WhatIfState;
+  // Null for scenarios saved before interests and skills were supported.
+  interests: string[] | null;
+  skills: UserProfile['skills'] | null;
   created_at: string;
   updated_at: string;
 }
 
-export async function loadWhatIfScenarios(): Promise<SavedWhatIfScenario[]> {
+async function requireUser() {
   const supabase = getSupabaseClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (!user) {
+    throw new Error('Please sign in to manage your scenarios.');
+  }
 
-  if (authError) throw authError;
-  if (!user) throw new Error('Please sign in to view your scenarios.');
+  return { supabase, user };
+}
+
+export async function loadWhatIfScenarios(): Promise<SavedWhatIfScenario[]> {
+  const { supabase, user } = await requireUser();
 
   const { data, error } = await supabase
     .from('what_if_scenarios')
@@ -34,19 +47,17 @@ export async function loadWhatIfScenarios(): Promise<SavedWhatIfScenario[]> {
 export async function saveWhatIfScenario(
   name: string,
   preferences: UserProfile['preferences'],
-  priorities: WhatIfState
+  priorities: WhatIfState,
+  interests: string[],
+  skills: UserProfile['skills']
 ): Promise<SavedWhatIfScenario> {
-  const supabase = getSupabaseClient();
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError) throw authError;
-  if (!user) throw new Error('Please sign in to save a scenario.');
-
+  const { supabase, user } = await requireUser();
   const trimmedName = name.trim();
 
   if (!trimmedName || trimmedName.length > 100) {
-    throw new Error('Scenario names must be between 1 and 100 characters.');
+    throw new Error(
+      'Scenario names must be between 1 and 100 characters.'
+    );
   }
 
   const { data, error } = await supabase
@@ -56,6 +67,8 @@ export async function saveWhatIfScenario(
       name: trimmedName,
       preferences,
       priorities,
+      interests: [...interests],
+      skills: { ...skills },
     })
     .select()
     .single();
@@ -65,13 +78,10 @@ export async function saveWhatIfScenario(
   return data as SavedWhatIfScenario;
 }
 
-export async function deleteWhatIfScenario(id: string): Promise<void> {
-  const supabase = getSupabaseClient();
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError) throw authError;
-  if (!user) throw new Error('Please sign in to delete a scenario.');
+export async function deleteWhatIfScenario(
+  id: string
+): Promise<void> {
+  const { supabase, user } = await requireUser();
 
   const { error } = await supabase
     .from('what_if_scenarios')
@@ -81,5 +91,3 @@ export async function deleteWhatIfScenario(id: string): Promise<void> {
 
   if (error) throw error;
 }
-
-
