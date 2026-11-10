@@ -29,11 +29,15 @@ export interface UserProfile {
   name: string;
   careerStage: string;
 
+  
   // Education and career background
   major?: string;
   minor?: string;
   completedDegree?: string;
   currentCareer?: string;
+
+  // Optional: use background to influence career recommendations
+  useCareerBackground?: boolean;
 
   interests: string[];
   skills: { [skillName: string]: number };
