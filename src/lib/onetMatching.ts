@@ -373,13 +373,14 @@ function responsePosition(
 ): number | null {
   const value = description.toLowerCase().trim();
 
-  if (category === 'teamwork') {
-    if (value.includes('extremely important')) return 100;
-    if (value.includes('very important')) return 80;
-    if (value.includes('important')) return 60;
-    if (value.includes('somewhat important')) return 35;
-    if (value.includes('not important')) return 0;
-  }
+  
+if (category === 'teamwork') {
+  if (value.includes('not important')) return 0;
+  if (value.includes('somewhat important')) return 35;
+  if (value.includes('extremely important')) return 100;
+  if (value.includes('very important')) return 80;
+  if (value.includes('important')) return 60;
+}
 
   if (category === 'freedom') {
     if (value.includes('a lot of freedom')) return 100;
