@@ -172,6 +172,115 @@ const TOPIC_TERMS: Record<string, string[]> = {
 };
 
 
+
+const BACKGROUND_TERMS: Record<string, string[]> = {
+  business: [
+    'business', 'manager', 'management', 'marketing',
+    'sales', 'operations', 'consultant', 'administrative',
+  ],
+  management: [
+    'manager', 'management', 'supervisor', 'director',
+    'administrator', 'operations', 'project',
+  ],
+  entrepreneurship: [
+    'business', 'marketing', 'sales', 'product',
+    'innovation', 'consultant', 'management',
+  ],
+  finance: [
+    'financial', 'finance', 'account', 'budget',
+    'investment', 'analyst', 'auditor',
+  ],
+  accounting: [
+    'account', 'auditor', 'financial', 'tax',
+    'budget',
+  ],
+  marketing: [
+    'marketing', 'advertis', 'market research',
+    'public relations', 'brand', 'sales',
+  ],
+  psychology: [
+    'psycholog', 'counsel', 'human resources',
+    'social', 'behavior', 'research',
+  ],
+  education: [
+    'teacher', 'education', 'school',
+    'instructor', 'training', 'curriculum',
+  ],
+  engineering: [
+    'engineer', 'technical', 'systems',
+    'design', 'manufacturing',
+  ],
+  computer: [
+    'software', 'computer', 'developer',
+    'programmer', 'data', 'systems',
+  ],
+  nursing: [
+    'nurs', 'health', 'patient',
+    'clinical', 'medical',
+  ],
+  healthcare: [
+    'health', 'medical', 'clinical',
+    'patient', 'care',
+  ],
+  environmental: [
+    'environment', 'conservation', 'ecolog',
+    'sustainab', 'natural resource',
+  ],
+  communication: [
+    'communications', 'public relations',
+    'writer', 'media', 'marketing',
+  ],
+  design: [
+    'design', 'creative', 'graphic',
+    'architect', 'artist',
+  ],
+};
+
+function getBackgroundTerms(profile: UserProfile): string[] {
+  if (profile.useCareerBackground !== true) {
+    return [];
+  }
+
+  const background = [
+    profile.major,
+    profile.minor,
+    profile.completedDegree,
+    profile.currentCareer,
+  ]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(' ')
+    .toLowerCase();
+
+  if (!background) return [];
+
+  const terms = new Set<string>();
+
+  for (const [keyword, relatedTerms] of Object.entries(
+    BACKGROUND_TERMS
+  )) {
+    if (background.includes(keyword)) {
+      relatedTerms.forEach((term) => terms.add(term));
+    }
+  }
+
+  // Include meaningful words from the student's own background.
+  const ignored = new Set([
+    'bachelor', 'masters', 'master', 'degree',
+    'diploma', 'general', 'major', 'minor',
+    'student', 'studies', 'science', 'arts',
+    'university', 'college', 'current',
+    'associate', 'certificate',
+  ]);
+
+  for (const word of background.split(/[^a-z]+/)) {
+    if (word.length >= 5 && !ignored.has(word)) {
+      terms.add(word);
+    }
+  }
+
+  return [...terms];
+}
+
 export function selectOnetCandidates(
   catalog: CatalogCareer[],
   profile: UserProfile
@@ -179,32 +288,63 @@ export function selectOnetCandidates(
   const interests = profile.interests ?? [];
   const goals = profile.goals ?? [];
 
-  const words = [...interests, ...goals].flatMap(
-    (label) => TOPIC_TERMS[label] ?? []
-  );
+  const interestTerms = [
+    ...new Set(
+      interests.flatMap((label) => TOPIC_TERMS[label] ?? [])
+    ),
+  ];
+
+  const goalTerms = [
+    ...new Set(
+      goals.flatMap((label) => TOPIC_TERMS[label] ?? [])
+    ),
+  ];
+
+  const backgroundTerms = getBackgroundTerms(profile);
 
   const ranked = catalog
     .map((career) => {
       const title = career.title.toLowerCase();
 
-      const hits = words.filter((term) =>
+      const interestHits = interestTerms.filter((term) =>
         title.includes(term)
       ).length;
 
-      return { career, hits };
+      const goalHits = goalTerms.filter((term) =>
+        title.includes(term)
+      ).length;
+
+      const backgroundHits = backgroundTerms.filter((term) =>
+        title.includes(term)
+      ).length;
+
+      // Interests remain the strongest discovery signal.
+      // Background is only a small ranking influence.
+      const score =
+        interestHits * 3 +
+        goalHits * 2 +
+        Math.min(backgroundHits, 3) * 0.4;
+
+      return {
+        career,
+        score,
+        coreHits: interestHits + goalHits,
+      };
     })
     .sort(
       (a, b) =>
-        b.hits - a.hits ||
+        b.score - a.score ||
         a.career.title.localeCompare(b.career.title)
     );
 
+  // Prioritize careers supported by core interests/goals.
   const relevant = ranked
-    .filter(({ hits }) => hits > 0)
+    .filter(({ coreHits }) => coreHits > 0)
     .map(({ career }) => career);
 
+  // Keep exploration opportunities outside those interests.
   const others = ranked
-    .filter(({ hits }) => hits === 0)
+    .filter(({ coreHits }) => coreHits === 0)
     .map(({ career }) => career);
 
   const selected: CatalogCareer[] = [];
@@ -212,7 +352,7 @@ export function selectOnetCandidates(
 
   while (
     selected.length < DETAIL_LIMIT &&
-    (i < relevant.length || i < others.length)
+    (i * 3 < relevant.length || i < others.length)
   ) {
     for (
       let j = 0;
@@ -224,10 +364,7 @@ export function selectOnetCandidates(
       selected.push(relevant[i * 3 + j]);
     }
 
-    if (
-      others[i] &&
-      selected.length < DETAIL_LIMIT
-    ) {
+    if (others[i] && selected.length < DETAIL_LIMIT) {
       selected.push(others[i]);
     }
 
