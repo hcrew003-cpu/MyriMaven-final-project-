@@ -327,19 +327,69 @@ export function selectOnetCandidates(
 
   // Prevent one title family (e.g. many kinds of supervisors) from
   // filling the shortlist. This is a soft limit, relaxed if needed.
-  const familyOf = (title: string) =>
-    title.toLowerCase().replace(/[^a-z ]/g, ' ').trim().split(/\s+/).slice(0, 2).join(' ');
+  
+const familyOf = (title: string) =>
+  title
+    .toLowerCase()
+    .replace(/[^a-z ]/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .join(' ');
 
-  const add = (item: (typeof scored)[number], enforceFamily = true) => {
-    const id = item.career.id;
-    const family = familyOf(item.career.title);
-    if (selectedIds.has(id) || selected.length >= DETAIL_LIMIT) return false;
-    if (enforceFamily && (familyCounts.get(family) ?? 0) >= 2) return false;
-    selected.push(item.career);
-    selectedIds.add(id);
-    familyCounts.set(family, (familyCounts.get(family) ?? 0) + 1);
-    return true;
-  };
+// The first two digits of an O*NET occupation code
+// identify its broad SOC occupational group.
+const occupationGroupOf = (id: string) =>
+  id.split('-')[0];
+
+const groupCounts = new Map<string, number>();
+
+// Allow variety across broad occupational groups.
+// This is a discovery limit, not a match-score penalty.
+const MAX_PER_GROUP = 8;
+
+  
+const add = (
+  item: (typeof scored)[number],
+  enforceDiversity = true
+) => {
+  const id = item.career.id;
+  const family = familyOf(item.career.title);
+  const group = occupationGroupOf(id);
+
+  if (
+    selectedIds.has(id) ||
+    selected.length >= DETAIL_LIMIT
+  ) {
+    return false;
+  }
+
+  if (enforceDiversity) {
+    if ((familyCounts.get(family) ?? 0) >= 2) {
+      return false;
+    }
+
+    if ((groupCounts.get(group) ?? 0) >= MAX_PER_GROUP) {
+      return false;
+    }
+  }
+
+  selected.push(item.career);
+  selectedIds.add(id);
+
+  familyCounts.set(
+    family,
+    (familyCounts.get(family) ?? 0) + 1
+  );
+
+  groupCounts.set(
+    group,
+    (groupCounts.get(group) ?? 0) + 1
+  );
+
+  return true;
+};
+
 
   // Reserve a small portion for exploration beyond the selected topics.
   const explorationSlots = Math.min(6, Math.floor(DETAIL_LIMIT / 6));
