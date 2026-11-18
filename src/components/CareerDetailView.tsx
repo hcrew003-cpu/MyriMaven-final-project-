@@ -6,6 +6,7 @@ import { useCareer } from '../context/CareerContext';
 import type { OnetCareer } from '../context/CareerContext';
 import type { UserProfile } from '../types/career';
 import { calculateOnetMatch } from '../lib/onetMatching';
+import { getMatchPresentation } from '../lib/matchPresentation';
 import CareerMarketOutlook from './CareerMarketOutlook';
 import AICareerDevelopmentPlan from './AICareerDevelopmentPlan';
 import { CAREERS } from '../data/careersData';
@@ -64,6 +65,18 @@ function OnetCareerDetail({
   onAskMaya: (prompt: string) => void;
 }) {
   const match = calculateOnetMatch(career, profile);
+  const presentation = getMatchPresentation(match.score);
+  const dimensions = [
+    { key: 'interests', label: 'Interests', weight: 30 },
+    { key: 'skills', label: 'Skills & Strengths', weight: 30 },
+    { key: 'preferences', label: 'Work Preferences', weight: 30 },
+    { key: 'goals', label: 'Career Goals', weight: 10 },
+  ] as const;
+  const availableWeight = dimensions.reduce((sum, item) =>
+    sum + (match.breakdown[item.key] === null ? 0 : item.weight), 0);
+  const neutralPreferences = Object.values(profile.preferences ?? {}).every(
+    value => typeof value === 'number' && value >= 40 && value <= 60
+  );
   const sectionTitle: React.CSSProperties = {
     fontSize: '1.25rem',
     fontWeight: 800,
@@ -120,12 +133,12 @@ function OnetCareerDetail({
 
                    <div style={{ marginTop: '20px' }}>
             <div
-              className={`match-badge ${
-                match.score >= 80 ? 'match-high' : 'match-med'
-              }`}
+              className="match-badge"
               style={{
                 display: 'inline-block',
                 padding: '10px 18px',
+                backgroundColor: presentation.background,
+                color: presentation.color,
               }}
             >
               {match.score}% Estimated Match for You
@@ -138,10 +151,48 @@ function OnetCareerDetail({
                 color: 'var(--text-muted)',
               }}
             >
-              O*NET code: {career.id} · Evidence coverage: {match.confidence}
+              O*NET code: {career.id}
             </p>
           </div>
         </div>
+
+        <section className="card" style={{ marginBottom: '28px' }}>
+          <h2 style={sectionTitle}>Your Career Match</h2>
+          <p style={{ ...items, marginBottom: '20px' }}>
+            {availableWeight > 0 ? presentation.label : 'Not enough information to estimate alignment'}. See how your profile connects to this occupation.
+          </p>
+          {dimensions.map(item => {
+            const score = match.breakdown[item.key];
+            const effectiveWeight = score === null || !availableWeight ? 0 : item.weight / availableWeight * 100;
+            const unavailable = item.key === 'preferences' && neutralPreferences ? 'Neutral — not scored' : 'Not assessed';
+            return (
+              <div key={item.key} style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '8px', fontWeight: 700 }}>
+                  <span>{item.label}</span>
+                  <span style={{ color: score === null ? 'var(--text-muted)' : getMatchPresentation(score).color }}>
+                    {score === null ? unavailable : `${score}%`}
+                  </span>
+                </div>
+                {score !== null && (
+                  <div role="progressbar" aria-label={item.label} aria-valuenow={score} aria-valuemin={0} aria-valuemax={100} style={{ height: '9px', borderRadius: '99px', backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${score}%`, borderRadius: '99px', backgroundColor: getMatchPresentation(score).bar }} />
+                  </div>
+                )}
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                  {item.weight}% standard weight · {Number(effectiveWeight.toFixed(1))}% of this calculation
+                </p>
+              </div>
+            );
+          })}
+          <details style={{ borderTop: '1px solid #E5E7EB', paddingTop: '16px' }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 700, color: 'var(--primary)' }}>How is my match calculated?</summary>
+            <p style={{ ...items, marginTop: '12px' }}>
+              Your estimated match is a weighted average of the assessed categories. Neutral work preferences and categories without sufficient evidence are excluded, and their weights are redistributed among the assessed categories. Some individual goals or preferences may also be unassessed.
+            </p>
+            <p style={items}>Career background can influence discovery and ranking, but does not change your match percentage. Education requirements are shown separately.</p>
+            <p style={items}>These estimates are exploratory indicators based on your profile and available O*NET data, not validated predictions of career success.</p>
+          </details>
+        </section>
 
         <CareerMarketOutlook
   code={career.id}
