@@ -108,12 +108,19 @@ export default function RecommendationsView() {
     );
     const bestIds = new Set(best.map(row => row.entry.career.id));
     const remaining = rows.filter(row => !bestIds.has(row.entry.career.id));
-    const unexpected = remaining.filter(row => !leadingGroups.has(row.group) &&
-      !row.background &&
-      ((row.skills ?? 0) >= 65 || (row.goals ?? 0) >= 65 || (row.interests ?? 0) >= 50));
+    // Require personal relevance independently of educational background.
+    const relevance = (row: typeof rows[number]) => Math.max(row.interests ?? 0, row.goals ?? 0);
+    const peak = Math.max(0, ...rows.map(relevance));
+    const threshold = Math.max(15, peak * 0.4);
+    const eligible = remaining.filter(row => relevance(row) >= threshold &&
+      row.entry.match.reasons.length > 0);
+    const unexpected = eligible.filter(row => !leadingGroups.has(row.group) && !row.background)
+      .sort((a, b) => relevance(b) - relevance(a) || b.entry.match.score - a.entry.match.score)
+      .slice(0, 8);
     const unexpectedIds = new Set(unexpected.map(row => row.entry.career.id));
-    const related = remaining.filter(row => !unexpectedIds.has(row.entry.career.id) &&
-      (row.background || (row.interests ?? 0) >= 45 || (row.skills ?? 0) >= 60 || (row.goals ?? 0) >= 65));
+    const related = eligible.filter(row => !unexpectedIds.has(row.entry.career.id))
+      .sort((a, b) => (relevance(b) + (b.background ? 8 : 0)) - (relevance(a) + (a.background ? 8 : 0)) || b.entry.match.score - a.entry.match.score)
+      .slice(0, 12);
     return {
       all: rankedCareers,
       best: best.map(row => row.entry),
@@ -397,7 +404,7 @@ export default function RecommendationsView() {
                   style={{
                     display: 'grid',
                     gridTemplateColumns:
-                      'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
+                      'repeat(auto-fill, minmax(min(100%, 340px), 1fr))',
                     gap: 24,
                   }}
                 >
