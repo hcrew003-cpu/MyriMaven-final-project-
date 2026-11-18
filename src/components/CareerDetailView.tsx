@@ -52,12 +52,14 @@ function OnetCareerDetail({
   career,
   profile,
   onBack,
+  backLabel,
   onRelated,
   onAskMaya,
 }: {
   career: OnetCareer;
   profile: UserProfile;
   onBack: () => void;
+  backLabel: string;
   onRelated: (id: string) => void;
   onAskMaya: (prompt: string) => void;
 }) {
@@ -84,7 +86,7 @@ function OnetCareerDetail({
           style={{ marginBottom: '24px' }}
         >
           <ArrowLeft size={16} />
-          Back to Explore Careers
+          {backLabel}
         </button>
 
         <div
@@ -408,6 +410,8 @@ function OnetCareerDetail({
 export default function CareerDetailView() {
   const {
     userProfile,
+    detailReturnView,
+    recommendationNavigation,
     selectedCareer,
     selectedCareerId,
     selectedOnetCareer,
@@ -421,6 +425,18 @@ export default function CareerDetailView() {
     isComparing,
     openMayaWithPrompt,
   } = useCareer();
+
+  const backLabels: Partial<Record<typeof detailReturnView, string>> = {
+    recommendations: recommendationNavigation.mode === 'browse' ? 'Back to Browse All Careers' : 'Back to Recommendations',
+    explore: 'Back to Explore Careers',
+    saved: 'Back to Saved Careers',
+    compare: 'Back to Compare',
+    'what-if': 'Back to What-If Sandbox',
+    dashboard: 'Back to Dashboard',
+    profile: 'Back to Profile',
+  };
+  const backLabel = backLabels[detailReturnView] ?? 'Back to Recommendations';
+  const goBack = () => setActiveView(backLabels[detailReturnView] ? detailReturnView : 'recommendations');
 
   const saved = isSaved(selectedCareer.id);
   const comparing = isComparing(selectedCareer.id);
@@ -458,9 +474,9 @@ export default function CareerDetailView() {
 
           <button
             className="btn-secondary btn-sm"
-            onClick={() => setActiveView('explore')}
+            onClick={goBack}
           >
-            Back to Explore
+            {backLabel}
           </button>
         </div>
       );
@@ -470,7 +486,8 @@ export default function CareerDetailView() {
       <OnetCareerDetail
         career={selectedOnetCareer}
         profile={userProfile}
-        onBack={() => setActiveView('explore')}
+        onBack={goBack}
+        backLabel={backLabel}
         onRelated={setSelectedCareerId}
         onAskMaya={openMayaWithPrompt}
       />
@@ -482,7 +499,7 @@ export default function CareerDetailView() {
     <div style={{ padding: '36px 0 80px' }}>
       <div className="container">
         <button
-          onClick={() => setActiveView('recommendations')}
+          onClick={goBack}
           className="btn-ghost"
           style={{
             marginBottom: '24px',
@@ -490,7 +507,7 @@ export default function CareerDetailView() {
           }}
         >
           <ArrowLeft size={16} />
-          <span>Back to Recommendations</span>
+          <span>{backLabel}</span>
         </button>
 
         <div
