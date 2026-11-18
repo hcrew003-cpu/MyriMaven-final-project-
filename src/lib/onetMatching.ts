@@ -8,6 +8,8 @@ export interface OnetMatchResult {
   reasons: string[];
   considerations: string[];
   skillsToDevelop: string[];
+  occupationalAlignment?: number;
+  matchedInterests?: string[];
   breakdown: {
     interests: number | null;
     skills: number | null;
@@ -20,10 +22,10 @@ type MatchCategory = keyof OnetMatchResult['breakdown'];
 type Preferences = UserProfile['preferences'];
 
 const CATEGORY_WEIGHTS: Record<MatchCategory, number> = {
-  interests: 30,
-  skills: 30,
+  interests: 45,
+  skills: 25,
   preferences: 20,
-  goals: 20,
+  goals: 10,
 };
 
 const INTEREST_TERMS: Record<string, string[]> = {
@@ -35,7 +37,7 @@ const INTEREST_TERMS: Record<string, string[]> = {
     'business administration', 'business strategy', 'marketing',
     'sales', 'finance', 'accounting', 'human resources',
     'market research', 'procurement', 'supply chain',
-    'management analysis', 'budgeting', 'business development',
+    'management analysis', 'budgeting', 'business development', 'project management', 'business operations', 'organizational strategy', 'market demand', 'consumer research', 'marketing policies',
   ],
   'Helping People': [
     'counsel', 'patient', 'community outreach',
@@ -44,11 +46,11 @@ const INTEREST_TERMS: Record<string, string[]> = {
   ],
   Creativity: [
     'design', 'artistic', 'creative',
-    'advertising', 'visual', 'originality',
+    'advertising', 'visual', 'originality', 'promotional campaigns', 'creative concepts', 'brand strategy', 'content creation',
   ],
   Environment: [
     'environmental', 'ecology', 'conservation',
-    'sustainability', 'natural resources',
+    'sustainability', 'natural resources', 'ecosystem', 'habitat', 'pollution', 'environment', 'soil conservation', 'restoration', 'wildlife', 'natural environment',
   ],
   'Problem Solving': [
     'problem solving', 'troubleshooting',
@@ -56,15 +58,15 @@ const INTEREST_TERMS: Record<string, string[]> = {
   ],
   Leadership: [
     'manage', 'supervis', 'leadership',
-    'direct operations', 'coordinate teams',
+    'direct operations', 'coordinate teams', 'project management', 'lead teams', 'staff development',
   ],
   'Working with Data': [
     'data analysis', 'statistics', 'analytics',
-    'data collection', 'quantitative',
+    'data collection', 'quantitative', 'statistical analysis', 'analyze data', 'interpret data', 'modeling', 'survey data',
   ],
   Communication: [
     'public speaking', 'writing', 'presentation',
-    'interpersonal communication', 'negotiation', 'interview', 'active listening', 'public relations', 'oral expression', 'explain information', 'advise clients', 'train employees', 'present findings',
+    'interpersonal communication', 'negotiation', 'interview', 'active listening', 'public relations', 'oral expression', 'explain information', 'advise clients', 'train employees', 'present findings', 'marketing communications', 'promotional campaigns', 'media relations',
   ],
   'Working with Children': [
     'children', 'child development',
@@ -76,7 +78,7 @@ const INTEREST_TERMS: Record<string, string[]> = {
   ],
   Entrepreneurship: [
     'business development', 'entrepreneur',
-    'startup', 'business strategy',
+    'startup', 'business strategy', 'market opportunities', 'new products', 'product development', 'business plans', 'market research', 'innovation',
   ],
 };
 
@@ -202,7 +204,8 @@ function matchingTerms(
 }
 
 function getOccupationSections(career: OnetCareer) {
-  const description = normalize(`${career.title ?? ''} ${career.description ?? ''}`);
+  const title = normalize(career.title ?? '');
+  const description = normalize(career.description ?? '');
 
   const tasks = normalize(
     (career.tasks?.task ?? [])
@@ -222,7 +225,7 @@ function getOccupationSections(career: OnetCareer) {
       .join(' ')
   );
 
-  return { description, tasks, skills, knowledge };
+  return { title, description, tasks, skills, knowledge };
 }
 
 type Sections = ReturnType<typeof getOccupationSections>;
@@ -267,12 +270,35 @@ function evidenceStrength(
   };
 }
 
+// Direct occupational evidence is intentionally distinct from transferable skills.
+function interestEvidence(sections: Sections, terms: readonly string[]) {
+  const title = matchingTerms(sections.title, terms);
+  const description = matchingTerms(sections.description, terms);
+  const tasks = matchingTerms(sections.tasks, terms);
+  const knowledge = matchingTerms(sections.knowledge, terms);
+  const coverage = (hits: string[]) => Math.min(1, hits.length / 2 + (hits.length ? 0.2 : 0));
+  const score = clamp(Math.round(20 * coverage(title) + 35 * coverage(description) + 35 * coverage(tasks) + 10 * coverage(knowledge)));
+  return { score, evidence: [...new Set([...description, ...tasks, ...title, ...knowledge])] };
+}
+
+// Explicit crosswalk to O*NET skill names; not a professional qualification test.
+const DIRECT_SKILLS: Record<string, string[]> = {
+  Communication: ['active listening', 'speaking', 'writing', 'reading comprehension', 'negotiation', 'persuasion'],
+  Leadership: ['management of personnel resources', 'instructing', 'coordination'],
+  Organization: ['time management', 'coordination', 'management of material resources'],
+  'Problem Solving': ['complex problem solving', 'critical thinking', 'judgment and decision making', 'troubleshooting'],
+  Research: ['science', 'active learning', 'reading comprehension'],
+  Creativity: ['technology design'],
+  Teamwork: ['coordination', 'social perceptiveness', 'active listening'],
+  'Analytical Thinking': ['mathematics', 'critical thinking', 'systems analysis', 'systems evaluation', 'judgment and decision making'],
+};
+
 function readableEvidence(terms: string[]): string {
   const labels: Record<string, string> = {
     counsel: 'counseling', psycholog: 'psychology', diagnos: 'diagnostic work',
     supervis: 'supervision', manage: 'management', nurs: 'nursing',
     patient: 'patient care', teach: 'teaching', interview: 'interviewing',
-    design: 'design work', creative: 'creative work',
+    design: 'design work', creative: 'creative work', artistic: 'artistic work', environmental: 'environmental work', quantitative: 'quantitative analysis', 'assist clients': 'client assistance',
   };
   return [...new Set(terms.map(term => labels[term] ?? term))].slice(0, 2).join(' and ');
 }
@@ -627,14 +653,16 @@ export function calculateOnetMatch(
 
   // INTERESTS
   const interestScores: number[] = [];
+  const matchedInterests: string[] = [];
 
-  for (const interest of (scenarioProfile?.interests ?? profile.interests) ?? []) {
+  for (const interest of new Set((scenarioProfile?.interests ?? profile.interests) ?? [])) {
     const terms = INTEREST_TERMS[interest] ?? [
       normalize(interest),
     ];
 
-    const evidence = evidenceStrength(sections, terms);
+    const evidence = interestEvidence(sections, terms);
     interestScores.push(evidence.score);
+    if (evidence.score >= 35) matchedInterests.push(interest);
 
     if (evidence.score >= 35) {
       rankedReasons.push({
@@ -671,8 +699,8 @@ export function calculateOnetMatch(
     // Strong connections receive more weight,
     // but weaker connections still matter.
     return Math.round(
-      strongestAverage * 0.65 +
-      overallAverage * 0.35
+      strongestAverage * 0.50 +
+      overallAverage * 0.50
     );
   })();
 
@@ -692,22 +720,25 @@ export function calculateOnetMatch(
 
     const evidence = evidenceStrength(sections, terms);
 
-    if (evidence.score < 15) continue;
+    const directNames = new Set((DIRECT_SKILLS[skillName] ?? []).map(normalize));
+    const direct = (career.skills?.element ?? []).filter(skill => directNames.has(normalize(skill.name)));
+    const relevance = Math.max(evidence.score, direct.length ? 45 : 0);
+    if (relevance < 15) continue;
 
     const rating = clamp(rawRating, 1, 5);
     const readiness = ((rating - 1) / 4) * 100;
 
     // Readiness matters only to the extent that the occupation uses the skill.
     skillScores.push(readiness);
-    skillWeights.push(evidence.score);
+    skillWeights.push(relevance);
 
-    if (rating >= 4 && evidence.score >= 45) {
+    if (rating >= 4 && relevance >= 45) {
       rankedReasons.push({
-        text: `Your self-rated strength in ${skillName.toLowerCase()} may support work involving ${readableEvidence(evidence.evidence)}.`,
-        strength: evidence.score * readiness / 100,
+        text: `Your self-rated strength in ${skillName.toLowerCase()} may support work involving ${readableEvidence(direct.length ? direct.map(skill => skill.name.toLowerCase()) : evidence.evidence)}.`,
+        strength: relevance * readiness / 100,
       });
-    } else if (rating <= 3 && evidence.score >= 55 &&
-      matchingTerms(`${sections.description} ${sections.tasks}`, terms).length >= 2) {
+    } else if (rating <= 3 && (direct.length >= 2 || (evidence.score >= 55 &&
+      matchingTerms(`${sections.description} ${sections.tasks}`, terms).length >= 2))) {
       skillsToDevelop.push(skillName);
     }
   }
@@ -876,8 +907,17 @@ const preferenceScore = average(
     );
   }
 
+  const education = (career.education?.response ?? [])
+    .filter(item => typeof item.title === 'string' && Number.isFinite(item.percentage_of_respondents))
+    .sort((a, b) => b.percentage_of_respondents - a.percentage_of_respondents)[0];
+  if (education && education.percentage_of_respondents > 0) {
+    considerations.unshift(`Education: ${Math.round(education.percentage_of_respondents)}% of O*NET respondents reported ${education.title.toLowerCase()} as the required education level. Check local requirements.`);
+  }
+
   return {
     score: clamp(score),
+    occupationalAlignment: interestScore ?? 0,
+    matchedInterests,
     confidence,
     reasons: [...new Set([...rankedReasons.sort((a, b) => b.strength - a.strength).map(item => item.text), ...reasons])].slice(0, 5),
     considerations: [...new Set(considerations)],
