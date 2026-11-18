@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useCareer } from '../context/CareerContext';
 import { useOnetRecommendations } from '../hooks/useOnetRecommendations';
 import {
@@ -62,6 +62,8 @@ function categoryMatch(
 export default function RecommendationsView() {
   const {
     userProfile,
+    recommendationNavigation,
+    setRecommendationNavigation,
     setActiveView,
     setSelectedCareerId,
     compareCareerIds,
@@ -81,14 +83,12 @@ export default function RecommendationsView() {
     reload,
   } = useOnetRecommendations();
 
-  const [mode, setMode] = useState<'recommended' | 'browse'>(
-    'recommended'
-  );
-
-  const [filter, setFilter] = useState<Filter>('all');
-  const [explorationFilter, setExplorationFilter] = useState<ExplorationFilter>('best');
-  const [query, setQuery] = useState('');
-  const [page, setPage] = useState(1);
+  const { mode, filter, explorationFilter, query, page } = recommendationNavigation;
+  const setMode = (mode: 'recommended' | 'browse') => setRecommendationNavigation(prev => ({ ...prev, mode }));
+  const setFilter = (filter: Filter) => setRecommendationNavigation(prev => ({ ...prev, filter }));
+  const setExplorationFilter = (explorationFilter: ExplorationFilter) => setRecommendationNavigation(prev => ({ ...prev, explorationFilter }));
+  const setQuery = (query: string) => setRecommendationNavigation(prev => ({ ...prev, query }));
+  const setPage = (page: number | ((previous: number) => number)) => setRecommendationNavigation(prev => ({ ...prev, page: typeof page === 'function' ? page(prev.page) : page }));
 
   const backgroundLabels = [userProfile.major, userProfile.minor]
     .filter((value): value is string => Boolean(value?.trim()));
