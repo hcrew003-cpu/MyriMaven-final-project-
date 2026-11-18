@@ -346,6 +346,24 @@ export default function ProfileView() {
     }
   };
 
+  const toggleCareerBackground = async () => {
+    if (!authUser || saving || editing !== null) return;
+    const enabled = userProfile.useCareerBackground !== true;
+    const nextProfile = { ...userProfile, useCareerBackground: enabled };
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      await saveUserProfile(authUser, nextProfile);
+      updateUserProfile({ useCareerBackground: enabled });
+      setSuccess(`Career background ${enabled ? 'enabled' : 'disabled'} successfully.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save your background preference. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const interests = userProfile.interests ?? [];
   const goals = userProfile.goals ?? [];
 
@@ -766,6 +784,44 @@ export default function ProfileView() {
               )}
             </div>
           )}
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #e5e7eb' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div>
+                <strong>Include career background</strong>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+                  {userProfile.useCareerBackground === true
+                    ? 'Prioritize careers connected to your education or experience.'
+                    : 'Explore careers without prioritizing your career background.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-label="Include career background"
+                aria-checked={userProfile.useCareerBackground === true}
+                disabled={saving || editing !== null}
+                onClick={toggleCareerBackground}
+                style={{
+                  position: 'relative', width: 48, height: 28, borderRadius: 20,
+                  border: 'none', flexShrink: 0,
+                  background: userProfile.useCareerBackground === true ? 'var(--primary)' : '#9ca3af',
+                  cursor: saving || editing !== null ? 'not-allowed' : 'pointer',
+                  opacity: saving || editing !== null ? 0.6 : 1,
+                }}
+              >
+                <span aria-hidden="true" style={{
+                  position: 'absolute', top: 4,
+                  left: userProfile.useCareerBackground === true ? 24 : 4,
+                  width: 20, height: 20, borderRadius: '50%', background: 'white',
+                  transition: 'left 0.2s ease',
+                }} />
+              </button>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>
+              This setting changes career discovery and ordering, not estimated match percentages.
+              {editing !== null ? ' Save or cancel your edits before changing this setting.' : ''}
+            </p>
+          </div>
         </div>
 
         {/* Interests, Skills, Preferences, Goals */}
