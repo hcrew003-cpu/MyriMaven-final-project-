@@ -40,7 +40,7 @@ const INTEREST_TERMS: Record<string, string[]> = {
   'Helping People': [
     'counsel', 'patient', 'community outreach',
     'social service', 'assist clients', 'rehabilitation',
-    'support individuals', 'mental health', 'advocacy',
+    'support individuals', 'mental health', 'advocacy', 'social work', 'therapy', 'psycholog', 'client support', 'behavioral health',
   ],
   Creativity: [
     'design', 'artistic', 'creative',
@@ -52,7 +52,7 @@ const INTEREST_TERMS: Record<string, string[]> = {
   ],
   'Problem Solving': [
     'problem solving', 'troubleshooting',
-    'critical thinking', 'diagnos',
+    'critical thinking', 'diagnos', 'problem resolution', 'evaluate alternatives', 'assessment', 'identify problems', 'decision making',
   ],
   Leadership: [
     'manage', 'supervis', 'leadership',
@@ -64,7 +64,7 @@ const INTEREST_TERMS: Record<string, string[]> = {
   ],
   Communication: [
     'public speaking', 'writing', 'presentation',
-    'communication', 'negotiation',
+    'communication', 'negotiation', 'interview', 'active listening', 'public relations', 'oral expression',
   ],
   'Working with Children': [
     'children', 'child development',
@@ -95,11 +95,11 @@ const SKILL_TERMS: Record<string, string[]> = {
   ],
   'Problem Solving': [
     'complex problem solving',
-    'critical thinking', 'troubleshooting',
+    'critical thinking', 'troubleshooting', 'decision making', 'problem resolution',
   ],
   Research: [
     'research', 'information gathering',
-    'investigation',
+    'investigation', 'collect data', 'review literature', 'evaluate evidence', 'scientific inquiry',
   ],
   Creativity: [
     'design', 'originality', 'creative thinking',
@@ -107,7 +107,7 @@ const SKILL_TERMS: Record<string, string[]> = {
   ],
   Teamwork: [
     'coordination', 'collaboration',
-    'working with others',
+    'working with others', 'work as a team', 'teamwork', 'collaborate',
   ],
   'Analytical Thinking': [
     'analysis', 'mathematics',
@@ -178,6 +178,10 @@ function clamp(value: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, value));
 }
 
+function isNeutralPreference(value: number): boolean {
+  return value >= 40 && value <= 60;
+}
+
 function normalize(value: string): string {
   return value.toLowerCase().replace(/\s+/g, ' ').trim();
 }
@@ -198,7 +202,7 @@ function matchingTerms(
 }
 
 function getOccupationSections(career: OnetCareer) {
-  const description = normalize(career.description ?? '');
+  const description = normalize(`${career.title ?? ''} ${career.description ?? ''}`);
 
   const tasks = normalize(
     (career.tasks?.task ?? [])
@@ -236,11 +240,17 @@ function evidenceStrength(
     sections.knowledge, terms
   );
 
-  const score =
+  const earned =
     (descriptionMatches.length ? 45 : 0) +
     (taskMatches.length ? 35 : 0) +
     (skillMatches.length ? 15 : 0) +
     (knowledgeMatches.length ? 5 : 0);
+
+  const available = (sections.description ? 45 : 0) +
+    (sections.tasks ? 35 : 0) + (sections.skills ? 15 : 0) +
+    (sections.knowledge ? 5 : 0);
+  // Do not penalize missing minor sources; avoid amplifying sparse records.
+  const score = Math.round(earned / Math.max(80, available) * 100);
 
   return {
     score,
@@ -314,7 +324,7 @@ function calculatePreferenceMatch(
       Number.isFinite(rawPreference) ? rawPreference : 50
     );
 
-    if (userPosition === 50) continue;
+    if (isNeutralPreference(userPosition)) continue;
 
     // 100 means the preference and available evidence
     // align; 0 means they point in opposite directions.
@@ -450,7 +460,7 @@ function calculateWorkLocationPreference(
   const raw = Number(preferences.officeVsRemote ?? 50);
   const remotePreference = clamp(Number.isFinite(raw) ? raw : 50);
 
-  if (remotePreference === 50) return { score: null, reason: null };
+  if (isNeutralPreference(remotePreference)) return { score: null, reason: null };
 
   // If both kinds of duties appear, prefer caution: physical presence may
   // still be necessary. This is a heuristic, not a remote eligibility test.
@@ -571,7 +581,7 @@ function calculateWorkContextPreferences(
         : 50
     );
 
-    if (userPosition === 50) continue;
+    if (isNeutralPreference(userPosition)) continue;
 
     const fit = clamp(
       100 - Math.abs(
@@ -661,7 +671,7 @@ export function calculateOnetMatch(
   for (const [skillName, rawRating] of Object.entries(
     scenarioProfile?.skills ?? profile.skills ?? {}
   )) {
-    if (typeof rawRating !== 'number') continue;
+    if (typeof rawRating !== 'number' || !Number.isFinite(rawRating) || rawRating < 1) continue;
 
     const terms = SKILL_TERMS[skillName] ?? [
       normalize(skillName),
@@ -675,14 +685,14 @@ export function calculateOnetMatch(
     const readiness = ((rating - 1) / 4) * 100;
 
     skillScores.push(
-      readiness * 0.4 + evidence.score * 0.6
+      readiness * 0.7 + evidence.score * 0.3
     );
 
     if (rating >= 4) {
       reasons.push(
         `Your self-rated strength in ${skillName.toLowerCase()} may help with ${evidence.evidence[0]}-related work.`
       );
-    } else {
+    } else if (rating <= 3 && evidence.score >= 35) {
       skillsToDevelop.push(skillName);
     }
   }
@@ -732,10 +742,15 @@ const preferenceScore = average(
   }
 
   const locationPreference = Number(selectedPreferences.officeVsRemote ?? 50);
-  if (locationPreference > 50 && workLocationResult.reason && workLocationResult.score !== null && workLocationResult.score < 70) {
+  if (locationPreference > 60 && workLocationResult.reason &&
+      workLocationResult.score !== null && workLocationResult.score < 70) {
     considerations.push(workLocationResult.reason);
-  } else if (locationPreference !== 50 && workLocationResult.score === null) {
-    considerations.push('Work location: insufficient task evidence to estimate location flexibility.');
+  }
+  if (skillsToDevelop.length) {
+    considerations.push(`Skills to develop: ${[...new Set(skillsToDevelop)].slice(0, 2).join(', ')}.`);
+  }
+  if (combinedPreferenceScores.some(value => value < 50) && considerations.length === 0) {
+    considerations.push('Some work preferences may differ from this occupation’s typical duties or surveyed working conditions. Review the preference breakdown and full profile.');
   }
 
   // GOALS
@@ -821,24 +836,12 @@ const preferenceScore = average(
         ? 'moderate'
         : 'limited';
 
-  const hasActivePreference = Object.values(selectedPreferences).some(value => typeof value === 'number' && value !== 50);
-  if (preferenceScore === null && hasActivePreference) {
-    considerations.push(
-      'Available occupation descriptions did not provide enough evidence to score work preferences.'
-    );
-  } else if (preferenceScore !== null) {
-  considerations.push(
-    'Work-preference estimates combine descriptive keyword evidence with available O*NET workplace survey responses.'
+  const hasActivePreference = Object.values(selectedPreferences).some(
+    value => typeof value === 'number' && Number.isFinite(value) && !isNeutralPreference(clamp(value))
   );
-}
-
-  considerations.push(
-  'Collaboration, work structure, and work pace use available O*NET workplace survey responses. These are exploratory estimates, not guaranteed working conditions.'
-);
-
-considerations.push(
-  'Work location uses exploratory on-site and digital-duty indicators. A digital task does not establish remote availability, and employers may require attendance. Careers with insufficient evidence remain unscored for location.'
-);
+  if (preferenceScore === null && hasActivePreference) {
+    considerations.push('Available occupation information did not provide enough evidence to evaluate your selected work preferences.');
+  }
 
   if (skillScore === null) {
     considerations.push(
@@ -862,7 +865,7 @@ considerations.push(
     score: clamp(score),
     confidence,
     reasons: [...new Set(reasons)].slice(0, 5),
-    considerations,
+    considerations: [...new Set(considerations)],
     skillsToDevelop: [...new Set(skillsToDevelop)].slice(0, 6),
     breakdown,
   };
