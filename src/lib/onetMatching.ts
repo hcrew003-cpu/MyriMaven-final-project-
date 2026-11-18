@@ -24,9 +24,9 @@ type MatchCategory = keyof OnetMatchResult['breakdown'];
 type Preferences = UserProfile['preferences'];
 
 const CATEGORY_WEIGHTS: Record<MatchCategory, number> = {
-  interests: 45,
-  skills: 25,
-  preferences: 20,
+  interests: 30,
+  skills: 30,
+  preferences: 30,
   goals: 10,
 };
 
@@ -848,7 +848,7 @@ export function calculateOnetMatch(
   // Give more importance to the student's strongest
   // connections while still considering all interests.
   const interestScore = (() => {
-    if (interestScores.length === 0) return null;
+    if (interestScores.length === 0 || !(sections.description || sections.tasks || sections.knowledge)) return null;
 
     const sortedScores = [...interestScores].sort(
       (a, b) => b - a
@@ -865,8 +865,8 @@ export function calculateOnetMatch(
       interestScores.length;
 
     return Math.round(
-      strongestAverage * 0.50 +
-      overallAverage * 0.50
+      strongestAverage * 0.70 +
+      overallAverage * 0.30
     );
   })();
 
@@ -914,7 +914,8 @@ export function calculateOnetMatch(
     // Readiness matters only to the extent that
     // the occupation uses the skill.
     skillScores.push(readiness);
-    skillWeights.push(relevance);
+    // Modestly emphasize existing self-rated strengths without changing readiness.
+    skillWeights.push(relevance * (rating >= 4 ? 1.20 : 1));
 
     if (rating >= 4 && relevance >= 45) {
       rankedReasons.push({
@@ -1067,6 +1068,7 @@ export function calculateOnetMatch(
 
     const evidence = evidenceStrength(sections, terms);
 
+    if (!(sections.description || sections.tasks || sections.skills || sections.knowledge)) continue;
     goalScores.push(evidence.score);
 
     if (evidence.score >= 35) {
@@ -1188,7 +1190,10 @@ export function calculateOnetMatch(
 
   return {
     score: clamp(score),
-    occupationalAlignment: interestScore ?? 0,
+    occupationalAlignment: interestScores.length ? Math.round(
+      (average([...interestScores].sort((a, b) => b - a).slice(0, 2)) ?? 0) * 0.5 +
+      (average(interestScores) ?? 0) * 0.5
+    ) : 0,
     matchedInterests,
     coreInterestMatches,
     dutyInterestScores,
