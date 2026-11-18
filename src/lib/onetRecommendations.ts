@@ -8,7 +8,7 @@ export type CatalogCareer = {
   jobZone: string | null;
 };
 
-export const DETAIL_LIMIT = 60;
+export const DETAIL_LIMIT = 100;
 
 
 const TOPIC_TERMS: Record<string, string[]> = {
@@ -41,7 +41,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
   ],
 
   'Helping People': [
-    'case worker', 'community health worker', 'human resources specialist',
+    'case worker', 'community health worker', 'human resources specialist', 'training and development specialist', 'social and community service manager', 'health education specialist', 'rehabilitation counselor', 'patient advocate',
     'counsel', 'social work', 'social service',
     'therap', 'health', 'care',
     'teacher', 'advisor', 'advocate',
@@ -83,7 +83,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
   ],
 
   'Problem Solving': [
-    'management analyst', 'compliance officer', 'quality control analyst',
+    'management analyst', 'compliance officer', 'quality control analyst', 'psycholog', 'counsel', 'market research', 'social and community service manager',
     'analyst', 'engineer', 'scientist',
     'technician', 'research', 'investigator',
     'diagnostic', 'quality assurance',
@@ -126,13 +126,13 @@ const TOPIC_TERMS: Record<string, string[]> = {
 
   Communication: [
     'public relations specialist', 'human resources specialist', 'fundraiser',
-    'public relations', 'writer', 'reporter',
-    'marketing', 'teacher', 'communications',
+    'public relations', 'writer', 'reporter', 'counsel', 'psycholog', 'training and development', 'human resources', 'market research',
+    'marketing', 'teacher', 'communications specialist', 'communications manager', 'communications teachers',
     'journalist', 'editor', 'interpreter',
     'translator', 'broadcast',
     'media relations', 'public affairs',
     'fundraising', 'recruiter',
-    'training specialist', 'speech',
+    'training and development specialist', 'training specialist', 'speech',
     'advertising', 'announcer',
     'technical writer', 'customer relations',
     'community outreach',
@@ -200,7 +200,7 @@ const BACKGROUND_TERMS: Record<string, string[]> = {
   nursing: ['nurs', 'patient care', 'clinical', 'medical'],
   healthcare: ['health', 'medical', 'clinical', 'patient care'],
   environmental: ['environment', 'conservation', 'ecolog', 'sustainab', 'natural resource', 'hydrolog', 'wildlife'],
-  communication: ['communications', 'public relations', 'writer', 'media', 'marketing'],
+  communication: ['communications specialist', 'communications manager', 'communications teachers', 'public relations', 'writer', 'media', 'marketing'],
   design: ['design', 'creative', 'graphic', 'architect', 'artist'],
 };
 
@@ -251,7 +251,7 @@ function getBackgroundTerms(profile: UserProfile): string[] {
 
 // Title-based discovery proxies only. Detailed matching still uses O*NET evidence.
 const SKILL_TERMS: Record<string, string[]> = {
-  Communication: ['public relations', 'writer', 'communications', 'counsel', 'recruit', 'sales', 'training specialist', 'fundrais'],
+  Communication: ['public relations', 'writer', 'public affairs', 'counsel', 'recruit', 'sales', 'training specialist', 'fundrais'],
   Leadership: ['project management', 'training specialist', 'manager', 'supervisor', 'director', 'coordinator'],
   Organization: ['logistics', 'planner', 'project management', 'administrative', 'procurement', 'event planner', 'scheduler'],
   'Problem Solving': ['analyst', 'engineer', 'research', 'consultant', 'investigator', 'technician'],
@@ -268,12 +268,12 @@ const GOAL_TERMS: Record<string, string[]> = {
   makinganimpact: ['community', 'public health', 'conservation', 'social service', 'fundrais', 'policy'],
   impact: ['community', 'public health', 'conservation', 'social service', 'fundrais', 'policy'],
 };
-const GENERIC = new Set(['manager', 'management', 'director', 'supervisor', 'administrator', 'executive', 'operations', 'teacher', 'analyst', 'research', 'coordinator', 'care', 'systems', 'product', 'project']);
+const GENERIC = new Set(['manager', 'management', 'director', 'supervisor', 'administrator', 'executive', 'operations', 'teacher', 'analyst', 'research', 'coordinator', 'care', 'systems', 'product', 'project', 'scientist', 'technician', 'engineer', 'support specialist', 'health', 'education', 'community', 'technology', 'testing', 'consultant', 'advisor', 'family', 'specialist', 'communications', 'digital', 'media']);
 function titleStrength(title: string, terms: string[]): number {
   return terms.reduce((best, term) => {
     const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const hit = new RegExp(`\\b${escaped}\\w*`, 'i').test(title);
-    return Math.max(best, hit ? (GENERIC.has(term) ? 0.35 : 1) : 0);
+    return Math.max(best, hit ? (GENERIC.has(term) ? 0.2 : 1) : 0);
   }, 0);
 }
 
@@ -307,7 +307,7 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
     const goalHits = goals.map(goal => titleStrength(title, GOAL_TERMS[goal]));
     const background = getCareerBackgroundRelevance(career, profile).strength;
     const strength = (hits: number[]) => 0.6 * Math.max(0,...hits) + 0.4 * mean(hits);
-    const score = 4 * strength(interestHits) + 3 * strength(skillHits) + 2 * strength(goalHits) + 1.5 * background;
+    const score = 5 * strength(interestHits) + 2 * strength(skillHits) + 2 * strength(goalHits) + 1.5 * background;
     return { career, score, interestHits, skillHits, goalHits, background };
   });
   type Item = (typeof scored)[number];
@@ -322,7 +322,7 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
     const group = career.id.split('-')[0];
     const family = career.title.toLowerCase().replace(/[^a-z ]/g,' ').trim().split(/\s+/).slice(0,2).join(' ');
     if (ids.has(career.id) || selected.length >= limit) return false;
-    if (diverse && ((groups.get(group) ?? 0) >= 8 || (families.get(family) ?? 0) >= 2)) return false;
+    if (diverse && ((groups.get(group) ?? 0) >= Math.ceil(DETAIL_LIMIT * 0.13) || (families.get(family) ?? 0) >= 2)) return false;
     selected.push(career); ids.add(career.id);
     groups.set(group,(groups.get(group) ?? 0)+1);
     families.set(family,(families.get(family) ?? 0)+1);
@@ -341,11 +341,11 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
     }
   };
   const limit = Math.min(DETAIL_LIMIT,catalog.length);
-  const mainLimit = Math.max(0,limit-Math.floor(limit/6));
+  const mainLimit = Math.max(0,limit-Math.floor(limit/10));
   const pools = [
-    ...interests.map((_,i) => ranked.filter(item => item.interestHits[i]>0)),
-    ...skills.map((_,i) => ranked.filter(item => item.skillHits[i]>0)),
-    ...goals.map((_,i) => ranked.filter(item => item.goalHits[i]>0)),
+    ...interests.map((_,i) => ranked.filter(item => item.interestHits[i]>=0.5)),
+    ...skills.map((_,i) => ranked.filter(item => item.skillHits[i]>=0.5)),
+    ...goals.map((_,i) => ranked.filter(item => item.goalHits[i]>=0.5)),
     ...(backgroundTerms.length ? [ranked.filter(item => item.background>0)] : []),
   ];
   // Reserve up to eight slots for background-connected occupations that
@@ -353,14 +353,14 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
   if (backgroundTerms.length) {
     const connected = ranked.filter(item =>
       item.background > 0 &&
-      [...item.interestHits, ...item.skillHits, ...item.goalHits].some(hit => hit > 0)
+      [...item.interestHits, ...item.skillHits, ...item.goalHits].some(hit => hit >= 0.5)
     );
     const reservedLimit = Math.min(mainLimit, 8);
     for (const item of connected) add(item, reservedLimit);
   }
   roundRobin(pools,mainLimit);
   for (const item of ranked) if (item.score>0) add(item,mainLimit);
-  const exploration = Object.keys(TOPIC_TERMS).filter(label => !interests.includes(label)).map(label => ranked.filter(item => titleStrength(item.career.title,TOPIC_TERMS[label])>0));
+  const exploration = Object.keys(TOPIC_TERMS).filter(label => !interests.includes(label)).map(label => ranked.filter(item => titleStrength(item.career.title,TOPIC_TERMS[label])>=0.5 && (item.interestHits.some(hit => hit >= 0.5) || item.goalHits.some(hit => hit >= 0.5) || item.skillHits.filter(hit => hit >= 0.5).length >= 2 || item.background > 0)));
   roundRobin(exploration,limit);
   for (const item of ranked) add(item,limit);
   for (const item of ranked) add(item,limit,false);
