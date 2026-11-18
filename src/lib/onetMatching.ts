@@ -64,7 +64,7 @@ const INTEREST_TERMS: Record<string, string[]> = {
   ],
   Communication: [
     'public speaking', 'writing', 'presentation',
-    'communication', 'negotiation', 'interview', 'active listening', 'public relations', 'oral expression',
+    'interpersonal communication', 'negotiation', 'interview', 'active listening', 'public relations', 'oral expression', 'explain information', 'advise clients', 'train employees', 'present findings',
   ],
   'Working with Children': [
     'children', 'child development',
@@ -83,7 +83,7 @@ const INTEREST_TERMS: Record<string, string[]> = {
 const SKILL_TERMS: Record<string, string[]> = {
   Communication: [
     'speaking', 'writing', 'active listening',
-    'negotiation', 'communication',
+    'negotiation', 'interpersonal communication',
   ],
   Leadership: [
     'management of personnel', 'leadership',
@@ -212,13 +212,13 @@ function getOccupationSections(career: OnetCareer) {
 
   const skills = normalize(
     (career.skills?.element ?? [])
-      .map((skill) => `${skill.name} ${skill.description}`)
+      .map((skill) => skill.name)
       .join(' ')
   );
 
   const knowledge = normalize(
     (career.knowledge?.element ?? [])
-      .map((item) => `${item.name} ${item.description}`)
+      .map((item) => item.name)
       .join(' ')
   );
 
@@ -240,11 +240,13 @@ function evidenceStrength(
     sections.knowledge, terms
   );
 
+  // Multiple distinct duty signals are stronger than isolated mentions.
+  const coverage = (hits: string[]) => hits.length === 0 ? 0 : hits.length === 1 ? 0.65 : hits.length === 2 ? 0.85 : 1;
   const earned =
-    (descriptionMatches.length ? 45 : 0) +
-    (taskMatches.length ? 35 : 0) +
-    (skillMatches.length ? 15 : 0) +
-    (knowledgeMatches.length ? 5 : 0);
+    45 * coverage(descriptionMatches) +
+    35 * coverage(taskMatches) +
+    15 * coverage(skillMatches) +
+    5 * coverage(knowledgeMatches);
 
   const available = (sections.description ? 45 : 0) +
     (sections.tasks ? 35 : 0) + (sections.skills ? 15 : 0) +
@@ -263,6 +265,16 @@ function evidenceStrength(
       ]),
     ],
   };
+}
+
+function readableEvidence(terms: string[]): string {
+  const labels: Record<string, string> = {
+    counsel: 'counseling', psycholog: 'psychology', diagnos: 'diagnostic work',
+    supervis: 'supervision', manage: 'management', nurs: 'nursing',
+    patient: 'patient care', teach: 'teaching', interview: 'interviewing',
+    design: 'design work', creative: 'creative work',
+  };
+  return [...new Set(terms.map(term => labels[term] ?? term))].slice(0, 2).join(' and ');
 }
 
 function average(values: number[]): number | null {
@@ -340,7 +352,7 @@ function calculatePreferenceMatch(
     ];
 
     reasons.push(
-      `${config.label}: your preference was compared with occupation references to ${evidence.join(' and ')}.`
+      `${config.label}: your preference was compared with occupation references to ${readableEvidence(evidence)}.`
     );
   }
 
@@ -609,6 +621,7 @@ export function calculateOnetMatch(
   const sections = getOccupationSections(career);
 
   const reasons: string[] = [];
+  const rankedReasons: { text: string; strength: number }[] = [];
   const considerations: string[] = [];
   const skillsToDevelop: string[] = [];
 
@@ -624,11 +637,10 @@ export function calculateOnetMatch(
     interestScores.push(evidence.score);
 
     if (evidence.score >= 35) {
-      reasons.push(
-        `Your interest in ${interest.toLowerCase()} connects with ${evidence.evidence
-          .slice(0, 2)
-          .join(' and ')} mentioned in this occupation's O*NET information.`
-      );
+      rankedReasons.push({
+        text: `Your interest in ${interest.toLowerCase()} aligns with occupation-specific activities such as ${readableEvidence(evidence.evidence)}.`,
+        strength: evidence.score + 15,
+      });
     }
   }
 
@@ -684,15 +696,16 @@ export function calculateOnetMatch(
     const rating = clamp(rawRating, 1, 5);
     const readiness = ((rating - 1) / 4) * 100;
 
-    skillScores.push(
-      readiness * 0.7 + evidence.score * 0.3
-    );
+    // Readiness matters only to the extent that the occupation uses the skill.
+    skillScores.push(evidence.score * (0.3 + 0.7 * readiness / 100));
 
-    if (rating >= 4) {
-      reasons.push(
-        `Your self-rated strength in ${skillName.toLowerCase()} may help with ${evidence.evidence[0]}-related work.`
-      );
-    } else if (rating <= 3 && evidence.score >= 35) {
+    if (rating >= 4 && evidence.score >= 45) {
+      rankedReasons.push({
+        text: `Your self-rated strength in ${skillName.toLowerCase()} may support work involving ${readableEvidence(evidence.evidence)}.`,
+        strength: evidence.score * readiness / 100,
+      });
+    } else if (rating <= 3 && evidence.score >= 55 &&
+      matchingTerms(`${sections.description} ${sections.tasks}`, terms).length >= 2) {
       skillsToDevelop.push(skillName);
     }
   }
@@ -778,11 +791,10 @@ const preferenceScore = average(
     goalScores.push(evidence.score);
 
     if (evidence.score >= 35) {
-      reasons.push(
-        `Your goal of ${goal.toLowerCase()} connects with ${evidence.evidence
-          .slice(0, 2)
-          .join(' and ')} described in this occupation.`
-      );
+      rankedReasons.push({
+        text: `Your goal of ${goal.toLowerCase()} connects to work involving ${readableEvidence(evidence.evidence)}.`,
+        strength: evidence.score + 5,
+      });
     }
   }
 
@@ -864,7 +876,7 @@ const preferenceScore = average(
   return {
     score: clamp(score),
     confidence,
-    reasons: [...new Set(reasons)].slice(0, 5),
+    reasons: [...new Set([...rankedReasons.sort((a, b) => b.strength - a.strength).map(item => item.text), ...reasons])].slice(0, 5),
     considerations: [...new Set(considerations)],
     skillsToDevelop: [...new Set(skillsToDevelop)].slice(0, 6),
     breakdown,
