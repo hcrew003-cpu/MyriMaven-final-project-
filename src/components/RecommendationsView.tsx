@@ -98,7 +98,10 @@ export default function RecommendationsView() {
     const rows = rankedCareers.map((entry) => {
       const { interests, skills, goals } = entry.match.breakdown;
       const alignment = entry.match.occupationalAlignment ?? interests ?? 0;
-      const interestCount = entry.match.matchedInterests?.length ?? 0;
+      const coreCount = entry.match.coreInterestMatches?.length ?? 0;
+      const dutyScores = Object.values(entry.match.dutyInterestScores ?? {});
+      const dutyPeak = Math.max(0, ...dutyScores);
+      const dutyCount = dutyScores.filter(score => score >= 35).length;
       const skill = skills ?? 0;
       const goal = goals ?? 0;
       const background = userProfile.useCareerBackground === true
@@ -109,8 +112,8 @@ export default function RecommendationsView() {
       const bestRank = entry.match.score * 0.55 + alignment * 0.45 + background * 6;
       const group = entry.career.id.split('-')[0];
       const family = entry.career.id.split('.')[0].slice(0, 5);
-      return { entry, alignment, interestCount, skill, goal, background,
-        personal, support, bestRank, group, family };
+      return { entry, alignment, skill, goal, background,
+        personal, support, bestRank, group, family, coreCount, dutyPeak, dutyCount };
     });
     type Row = (typeof rows)[number];
     const diverse = (pool: Row[], limit: number, familyLimit: number) => {
@@ -133,11 +136,18 @@ export default function RecommendationsView() {
     const threshold = Math.max(20, peak * 0.4);
     const eligible = remaining.filter(row => row.personal >= threshold && row.entry.match.reasons.length > 0);
     const relatedRank = (row: Row) => row.support + row.entry.match.score * 0.35 + row.background * 8;
-    const related = diverse(eligible.filter(row => leadingGroups.has(row.group) || row.background > 0 || row.interestCount >= 2)
+    const related = diverse(eligible.filter(row =>
+      row.coreCount > 0 ||
+      (row.dutyCount >= 2 && row.alignment >= 25) ||
+      (leadingGroups.has(row.group) && row.dutyPeak >= 35) ||
+      (row.background >= 0.35 && row.dutyPeak >= 25)
+    )
       .sort((a, b) => relatedRank(b) - relatedRank(a)), 12, 2);
     const relatedIds = new Set(related.map(row => row.entry.career.id));
     const unexpectedRank = (row: Row) => row.personal * 0.45 + row.support * 0.25 + row.entry.match.score * 0.30;
-    const unexpected = diverse(eligible.filter(row => !relatedIds.has(row.entry.career.id) && !leadingGroups.has(row.group) && row.background === 0 && (row.alignment >= 25 || row.skill >= 40))
+    const unexpected = diverse(eligible.filter(row => !relatedIds.has(row.entry.career.id) && !leadingGroups.has(row.group) && row.background < 0.35 && row.coreCount === 0 &&
+      row.dutyPeak >= 35 && row.alignment >= 20 &&
+      (row.dutyCount >= 2 || (row.skill >= 60 && row.goal >= 25)))
       .sort((a, b) => unexpectedRank(b) - unexpectedRank(a)), 8, 1);
     return {
       all: rankedCareers,
@@ -493,11 +503,22 @@ export default function RecommendationsView() {
                             <strong>
                               What to consider:{' '}
                             </strong>
-                            {match.skillsToDevelop.length
-                                ? `Skills to develop: ${match.skillsToDevelop
-                                    .slice(0, 2)
-                                    .join(', ')}.`
-                                : (match.considerations[0] ?? 'Review tasks and education requirements before deciding.')}
+                            {(() => {
+                              const education = match.considerations.find(
+                                item => item.startsWith('Education:')
+                              );
+                              const skills = match.skillsToDevelop.length
+                                ? `Skills to develop: ${match.skillsToDevelop.slice(0, 2).join(', ')}.`
+                                : null;
+                              const other = match.considerations.find(item =>
+                                !item.startsWith('Education:') &&
+                                !item.startsWith('Skills to develop:')
+                              );
+                              const items = [education, skills, other].filter(Boolean);
+                              return items.length ? items.map((item, index) => (
+                                <p key={index} style={{ marginTop: 6 }}>{item}</p>
+                              )) : <p style={{ marginTop: 6 }}>Review tasks and education requirements before deciding.</p>;
+                            })()}
                           </div>
 
                           
@@ -509,7 +530,7 @@ export default function RecommendationsView() {
 
                         </div>
 
-                        <div className="card-actions">
+                        <div className="card-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                           <div
                             style={{
                               display: 'flex',
@@ -541,6 +562,7 @@ export default function RecommendationsView() {
                                   ? 700
                                   : 500,
                                 transition: 'all 0.2s ease',
+                                whiteSpace: 'nowrap', flexShrink: 0,
                               }}
                             >
                               {isSaved(career.id) ? (
@@ -557,6 +579,8 @@ export default function RecommendationsView() {
 
                             <button
                               className="btn-secondary btn-sm"
+                              style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                              aria-pressed={isComparing(career.id)}
                               onClick={() =>
                                 toggleCompareCareer(career.id)
                               }
@@ -570,6 +594,7 @@ export default function RecommendationsView() {
 
                           <button
                             className="btn-primary btn-sm"
+                            style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                             onClick={() =>
                               openCareer(career.id)
                             }
