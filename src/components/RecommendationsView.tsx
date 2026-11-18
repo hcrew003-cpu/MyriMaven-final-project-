@@ -135,19 +135,21 @@ export default function RecommendationsView() {
     const peak = Math.max(0, ...rows.map(row => row.personal));
     const threshold = Math.max(20, peak * 0.4);
     const eligible = remaining.filter(row => row.personal >= threshold && row.entry.match.reasons.length > 0);
+    const leadingFamilies = new Set(best.slice(0, 6).map(row => row.family));
     const relatedRank = (row: Row) => row.support + row.entry.match.score * 0.35 + row.background * 8;
-    const related = diverse(eligible.filter(row =>
-      row.coreCount > 0 ||
-      (row.dutyCount >= 2 && row.alignment >= 25) ||
-      (leadingGroups.has(row.group) && row.dutyPeak >= 35) ||
-      (row.background >= 0.35 && row.dutyPeak >= 25)
-    )
+    // Reserve cross-field occupations for discovery, even if they share a core interest.
+    const isAdjacent = (row: Row) => leadingFamilies.has(row.family) ||
+      (leadingGroups.has(row.group) && (row.coreCount > 0 || row.dutyPeak >= 35)) ||
+      (row.background >= 0.35 && row.dutyPeak >= 25);
+    const related = diverse(eligible.filter(row => isAdjacent(row) &&
+      (row.coreCount > 0 || row.dutyPeak >= 35 || row.background >= 0.35))
       .sort((a, b) => relatedRank(b) - relatedRank(a)), 12, 2);
     const relatedIds = new Set(related.map(row => row.entry.career.id));
-    const unexpectedRank = (row: Row) => row.personal * 0.45 + row.support * 0.25 + row.entry.match.score * 0.30;
-    const unexpected = diverse(eligible.filter(row => !relatedIds.has(row.entry.career.id) && !leadingGroups.has(row.group) && row.background < 0.35 && row.coreCount === 0 &&
-      row.dutyPeak >= 35 && row.alignment >= 20 &&
-      (row.dutyCount >= 2 || (row.skill >= 60 && row.goal >= 25)))
+    const unexpectedRank = (row: Row) => row.dutyPeak * 0.35 + row.support * 0.35 + row.entry.match.score * 0.30;
+    const unexpected = diverse(eligible.filter(row => !relatedIds.has(row.entry.career.id) &&
+      !isAdjacent(row) && !leadingGroups.has(row.group) &&
+      ((row.coreCount > 0 && row.dutyPeak >= 45) ||
+       (row.dutyPeak >= 35 && row.skill >= 45 && (row.dutyCount >= 2 || row.goal >= 35))))
       .sort((a, b) => unexpectedRank(b) - unexpectedRank(a)), 8, 1);
     return {
       all: rankedCareers,
@@ -158,6 +160,9 @@ export default function RecommendationsView() {
   }, [rankedCareers, userProfile.useCareerBackground]);
 
   const recommended = exploration[explorationFilter];
+  const unscoredGoalNotes = useMemo(() => Array.from(new Set(
+    rankedCareers.flatMap(({ match }) => match.considerations.filter(item => item.startsWith('Not scored:')))
+  )), [rankedCareers]);
 
   const browsing = useMemo(
     () =>
@@ -422,6 +427,12 @@ export default function RecommendationsView() {
                     : `${rankedCareers.length} occupations evaluated from a shortlist drawn from ${catalog.length} available careers.`}
                 </p>
 
+                {unscoredGoalNotes.length > 0 && (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 18 }}>
+                    {unscoredGoalNotes.map(note => <p key={note}>{note}</p>)}
+                  </div>
+                )}
+
                 {userProfile.useCareerBackground === true && (
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 18 }}>
                     Career background is enabled. Relevant connections may move occupations higher in the list without changing their estimated match percentages.
@@ -512,7 +523,8 @@ export default function RecommendationsView() {
                                 : null;
                               const other = match.considerations.find(item =>
                                 !item.startsWith('Education:') &&
-                                !item.startsWith('Skills to develop:')
+                                !item.startsWith('Skills to develop:') &&
+                                !item.startsWith('Not scored:')
                               );
                               const items = [education, skills, other].filter(Boolean);
                               return items.length ? items.map((item, index) => (
