@@ -91,19 +91,12 @@ export function useOnetRecommendations() {
     return () => { cancelled = true; };
   }, [reloadKey]);
 
-  const candidates = useMemo(
-    () => selectOnetCandidates(catalog, userProfile),
-    [
-      catalog,
-      userProfile.interests,
-      userProfile.goals,
-      userProfile.useCareerBackground,
-      userProfile.major,
-      userProfile.minor,
-      userProfile.completedDegree,
-      userProfile.currentCareer,
-    ]
-  );
+ 
+const candidates = useMemo(
+  () => selectOnetCandidates(catalog, userProfile),
+  [catalog, userProfile]
+);
+
 
   const candidateKey = candidates.map((career) => career.id).join(',');
 
