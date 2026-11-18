@@ -679,6 +679,7 @@ export function calculateOnetMatch(
 
   // SKILLS
   const skillScores: number[] = [];
+  const skillWeights: number[] = [];
 
   for (const [skillName, rawRating] of Object.entries(
     scenarioProfile?.skills ?? profile.skills ?? {}
@@ -691,13 +692,14 @@ export function calculateOnetMatch(
 
     const evidence = evidenceStrength(sections, terms);
 
-    if (evidence.score === 0) continue;
+    if (evidence.score < 15) continue;
 
     const rating = clamp(rawRating, 1, 5);
     const readiness = ((rating - 1) / 4) * 100;
 
     // Readiness matters only to the extent that the occupation uses the skill.
-    skillScores.push(evidence.score * (0.3 + 0.7 * readiness / 100));
+    skillScores.push(readiness);
+    skillWeights.push(evidence.score);
 
     if (rating >= 4 && evidence.score >= 45) {
       rankedReasons.push({
@@ -710,7 +712,8 @@ export function calculateOnetMatch(
     }
   }
 
-  const skillScore = average(skillScores);
+  const skillWeight = skillWeights.reduce((sum, weight) => sum + weight, 0);
+  const skillScore = skillWeight ? skillScores.reduce((sum, value, i) => sum + value * skillWeights[i], 0) / skillWeight : null;
 
   // WORK PREFERENCES
   // Baseline uses saved preferences.
