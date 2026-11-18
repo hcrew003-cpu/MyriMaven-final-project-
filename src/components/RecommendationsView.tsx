@@ -25,7 +25,7 @@ const EXPLORATION_OPTIONS: [ExplorationFilter, string][] = [
   ['all', 'All Recommendations'],
 ];
 const EXPLORATION_DESCRIPTIONS: Record<ExplorationFilter, string> = {
-  best: 'Strong overall alignment across multiple areas of your profile.',
+  best: 'Your strongest available matches from the evaluated shortlist, ranked using your profile. Review individual estimates and evidence before deciding.',
   related: 'Explore careers that build on your interests, strengths or enabled career background.',
   unexpected: 'Discover careers outside your leading occupational fields that still connect to your profile.',
   all: 'View every evaluated occupation, including those with limited matching evidence.',
@@ -96,23 +96,20 @@ export default function RecommendationsView() {
   // Group by evidence patterns and occupational breadth, not total-score bands.
   const exploration = useMemo(() => {
     const rows = rankedCareers.map((entry) => {
-      const { interests, skills, preferences, goals } = entry.match.breakdown;
-      const dimensions = [interests, skills, preferences, goals];
-      const strong = dimensions.filter(value => value !== null && value >= 65).length;
+      const { interests, skills, goals } = entry.match.breakdown;
       const background = userProfile.useCareerBackground === true && entry.background?.strength > 0;
-      return { entry, strong, interests, skills, goals, background,
+      return { entry, interests, skills, goals, background,
         group: entry.career.id.split('-')[0] };
     });
-    const best = rows.filter(row => row.strong >= 2 &&
-      ((row.interests ?? 0) >= 50 || (row.skills ?? 0) >= 65))
-      .slice(0, 12);
+    // Keep the profile-informed ranking, even when absolute scores are modest.
+    const best = rows.slice(0, 12);
     const leadingGroups = new Set(
       (best.length ? best.slice(0, 6) : rows.slice(0, 6)).map(row => row.group)
     );
     const bestIds = new Set(best.map(row => row.entry.career.id));
     const remaining = rows.filter(row => !bestIds.has(row.entry.career.id));
     const unexpected = remaining.filter(row => !leadingGroups.has(row.group) &&
-      !row.background && (row.interests ?? 0) < 65 &&
+      !row.background &&
       ((row.skills ?? 0) >= 65 || (row.goals ?? 0) >= 65 || (row.interests ?? 0) >= 50));
     const unexpectedIds = new Set(unexpected.map(row => row.entry.career.id));
     const related = remaining.filter(row => !unexpectedIds.has(row.entry.career.id) &&
@@ -363,10 +360,10 @@ export default function RecommendationsView() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {EXPLORATION_OPTIONS.map(([key, label]) => (
                     <button key={key} type="button"
-                      className={`tag-chip ${explorationFilter === key ? 'active' : ''}`}
+                      className={explorationFilter === key ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
                       aria-pressed={explorationFilter === key}
                       onClick={() => setExplorationFilter(key)}
-                      style={{ padding: '8px 14px', borderRadius: 24 }}>
+                      style={{ padding: '8px 14px', borderRadius: 24, backgroundColor: explorationFilter === key ? '#0c6957' : '#ffffff', color: explorationFilter === key ? '#ffffff' : '#0c6957', border: '1px solid #0c6957', fontWeight: 600 }}>
                       {label} ({exploration[key].length})
                     </button>
                   ))}
