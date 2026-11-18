@@ -20,10 +20,10 @@ type MatchCategory = keyof OnetMatchResult['breakdown'];
 type Preferences = UserProfile['preferences'];
 
 const CATEGORY_WEIGHTS: Record<MatchCategory, number> = {
-  interests: 35,
+  interests: 30,
   skills: 30,
   preferences: 20,
-  goals: 15,
+  goals: 20,
 };
 
 const INTEREST_TERMS: Record<string, string[]> = {
@@ -32,12 +32,15 @@ const INTEREST_TERMS: Record<string, string[]> = {
     'information technology', 'digital systems',
   ],
   Business: [
-    'business', 'management', 'marketing',
-    'sales', 'finance', 'operations',
+    'business administration', 'business strategy', 'marketing',
+    'sales', 'finance', 'accounting', 'human resources',
+    'market research', 'procurement', 'supply chain',
+    'management analysis', 'budgeting', 'business development',
   ],
   'Helping People': [
-    'counsel', 'patient', 'community',
-    'social service', 'assist clients', 'teach',
+    'counsel', 'patient', 'community outreach',
+    'social service', 'assist clients', 'rehabilitation',
+    'support individuals', 'mental health', 'advocacy',
   ],
   Creativity: [
     'design', 'artistic', 'creative',
@@ -84,7 +87,7 @@ const SKILL_TERMS: Record<string, string[]> = {
   ],
   Leadership: [
     'management of personnel', 'leadership',
-    'supervis', 'direct',
+    'supervis', 'direct teams',
   ],
   Organization: [
     'time management', 'coordination',
@@ -281,6 +284,7 @@ function calculatePreferenceMatch(
   preferences: Preferences
 ): {
   score: number | null;
+  scores: number[];
   reasons: string[];
 } {
   const scores: number[] = [];
@@ -310,6 +314,8 @@ function calculatePreferenceMatch(
       Number.isFinite(rawPreference) ? rawPreference : 50
     );
 
+    if (userPosition === 50) continue;
+
     // 100 means the preference and available evidence
     // align; 0 means they point in opposite directions.
     const fit = 100 - Math.abs(
@@ -330,6 +336,7 @@ function calculatePreferenceMatch(
 
   return {
     score: average(scores),
+    scores,
     reasons,
   };
 }
@@ -442,6 +449,8 @@ function calculateWorkLocationPreference(
 
   const raw = Number(preferences.officeVsRemote ?? 50);
   const remotePreference = clamp(Number.isFinite(raw) ? raw : 50);
+
+  if (remotePreference === 50) return { score: null, reason: null };
 
   // If both kinds of duties appear, prefer caution: physical presence may
   // still be necessary. This is a heuristic, not a remote eligibility test.
@@ -562,6 +571,8 @@ function calculateWorkContextPreferences(
         : 50
     );
 
+    if (userPosition === 50) continue;
+
     const fit = clamp(
       100 - Math.abs(
         userPosition - occupationPosition
@@ -664,7 +675,7 @@ export function calculateOnetMatch(
     const readiness = ((rating - 1) / 4) * 100;
 
     skillScores.push(
-      readiness * 0.7 + evidence.score * 0.3
+      readiness * 0.4 + evidence.score * 0.6
     );
 
     if (rating >= 4) {
@@ -703,9 +714,7 @@ const workLocationResult = calculateWorkLocationPreference(
 
 const combinedPreferenceScores = [
   ...(workLocationResult.score === null ? [] : [workLocationResult.score]),
-  ...(preferenceResult.score === null
-    ? []
-    : [preferenceResult.score]),
+  ...preferenceResult.scores,
   ...workContextResult.scores,
 ];
 
@@ -722,10 +731,11 @@ const preferenceScore = average(
 );
   }
 
-  if (workLocationResult.reason) {
+  const locationPreference = Number(selectedPreferences.officeVsRemote ?? 50);
+  if (locationPreference > 50 && workLocationResult.reason && workLocationResult.score !== null && workLocationResult.score < 70) {
     considerations.push(workLocationResult.reason);
-  } else {
-    considerations.push('Work location: insufficient task evidence to estimate location flexibility for this occupation. The slider does not affect its score.');
+  } else if (locationPreference !== 50 && workLocationResult.score === null) {
+    considerations.push('Work location: insufficient task evidence to estimate location flexibility.');
   }
 
   // GOALS
@@ -735,7 +745,7 @@ const preferenceScore = average(
         .map(([key]) => key)
     : [];
 
-  const selectedGoals = activePriorities.length
+  const selectedGoals = scenarioPriorities !== undefined
     ? activePriorities
     : profile.goals ?? [];
 
@@ -811,11 +821,12 @@ const preferenceScore = average(
         ? 'moderate'
         : 'limited';
 
-  if (preferenceScore === null) {
+  const hasActivePreference = Object.values(selectedPreferences).some(value => typeof value === 'number' && value !== 50);
+  if (preferenceScore === null && hasActivePreference) {
     considerations.push(
       'Available occupation descriptions did not provide enough evidence to score work preferences.'
     );
-  } else {
+  } else if (preferenceScore !== null) {
   considerations.push(
     'Work-preference estimates combine descriptive keyword evidence with available O*NET workplace survey responses.'
   );
