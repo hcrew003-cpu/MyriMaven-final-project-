@@ -17,6 +17,19 @@ import {
 
 type Filter = 'all' | 'creative' | 'business' | 'tech';
 
+type ExplorationFilter = 'all' | 'best' | 'related' | 'unexpected';
+const EXPLORATION_OPTIONS: [ExplorationFilter, string][] = [
+  ['best', 'Best Matches'],
+  ['related', 'Related Paths'],
+  ['unexpected', 'Unexpected Possibilities'],
+  ['all', 'All Recommendations'],
+];
+const EXPLORATION_DESCRIPTIONS: Record<ExplorationFilter, string> = {
+  best: 'Strong overall alignment across multiple areas of your profile.',
+  related: 'Explore careers that build on your interests, strengths or enabled career background.',
+  unexpected: 'Discover careers outside your leading occupational fields that still connect to your profile.',
+  all: 'View every evaluated occupation, including those with limited matching evidence.',
+};
 const PAGE_SIZE = 30;
 
 function categoryMatch(
@@ -73,15 +86,46 @@ export default function RecommendationsView() {
   );
 
   const [filter, setFilter] = useState<Filter>('all');
+  const [explorationFilter, setExplorationFilter] = useState<ExplorationFilter>('best');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
 
   const backgroundLabels = [userProfile.major, userProfile.minor]
     .filter((value): value is string => Boolean(value?.trim()));
 
-  const recommended = rankedCareers.filter(
-    ({ career }) => categoryMatch(career.title, filter)
-  );
+  // Group by evidence patterns and occupational breadth, not total-score bands.
+  const exploration = useMemo(() => {
+    const rows = rankedCareers.map((entry) => {
+      const { interests, skills, preferences, goals } = entry.match.breakdown;
+      const dimensions = [interests, skills, preferences, goals];
+      const strong = dimensions.filter(value => value !== null && value >= 65).length;
+      const background = userProfile.useCareerBackground === true && entry.background?.strength > 0;
+      return { entry, strong, interests, skills, goals, background,
+        group: entry.career.id.split('-')[0] };
+    });
+    const best = rows.filter(row => row.strong >= 2 &&
+      ((row.interests ?? 0) >= 50 || (row.skills ?? 0) >= 65))
+      .slice(0, 12);
+    const leadingGroups = new Set(
+      (best.length ? best.slice(0, 6) : rows.slice(0, 6)).map(row => row.group)
+    );
+    const bestIds = new Set(best.map(row => row.entry.career.id));
+    const remaining = rows.filter(row => !bestIds.has(row.entry.career.id));
+    const unexpected = remaining.filter(row => !leadingGroups.has(row.group) &&
+      !row.background && (row.interests ?? 0) < 65 &&
+      ((row.skills ?? 0) >= 65 || (row.goals ?? 0) >= 65 || (row.interests ?? 0) >= 50));
+    const unexpectedIds = new Set(unexpected.map(row => row.entry.career.id));
+    const related = remaining.filter(row => !unexpectedIds.has(row.entry.career.id) &&
+      (row.background || (row.interests ?? 0) >= 45 || (row.skills ?? 0) >= 60 || (row.goals ?? 0) >= 65));
+    return {
+      all: rankedCareers,
+      best: best.map(row => row.entry),
+      related: related.map(row => row.entry),
+      unexpected: unexpected.map(row => row.entry),
+    };
+  }, [rankedCareers, userProfile.useCareerBackground]);
+
+  const recommended = exploration[explorationFilter];
 
   const browsing = useMemo(
     () =>
@@ -278,6 +322,7 @@ export default function RecommendationsView() {
               </div>
             )}
 
+            {mode === 'browse' ? (
             <div
               style={{
                 display: 'flex',
@@ -312,6 +357,25 @@ export default function RecommendationsView() {
                 </button>
               ))}
             </div>
+
+            ) : (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {EXPLORATION_OPTIONS.map(([key, label]) => (
+                    <button key={key} type="button"
+                      className={`tag-chip ${explorationFilter === key ? 'active' : ''}`}
+                      aria-pressed={explorationFilter === key}
+                      onClick={() => setExplorationFilter(key)}
+                      style={{ padding: '8px 14px', borderRadius: 24 }}>
+                      {label} ({exploration[key].length})
+                    </button>
+                  ))}
+                </div>
+                <p style={{ color: 'var(--text-muted)', marginTop: 12, fontSize: '0.9rem' }}>
+                  {EXPLORATION_DESCRIPTIONS[explorationFilter]}
+                </p>
+              </div>
+            )}
 
             {mode === 'recommended' ? (
               <>
@@ -372,7 +436,10 @@ export default function RecommendationsView() {
                             {career.title}
                           </h2>
 
-                          <p className="career-desc">
+                          <p className="career-desc" style={{
+                            display: '-webkit-box', WebkitLineClamp: 4,
+                            WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                          }}>
                             {career.description ||
                               'Open the occupation profile to learn more.'}
                           </p>
@@ -393,7 +460,7 @@ export default function RecommendationsView() {
                                 </strong>
                                 <p style={{ marginTop: 6 }}>
                                   {backgroundLabels.length
-                                    ? `Your studies (${backgroundLabels.join(' / ')}) may connect to this occupation through ${background.matchedTerms.slice(0, 3).join(', ')}.`
+                                    ? `Your studies (${backgroundLabels.join(' and ')}) may be relevant to this occupation through ${background.matchedTerms.slice(0, 3).join(', ')}.`
                                     : `Your career background may connect to this occupation through ${background.matchedTerms.slice(0, 3).join(', ')}.`}
                                   {' '}This is a possible connection, not a qualification assessment.
                                 </p>
@@ -404,12 +471,11 @@ export default function RecommendationsView() {
                             <strong>
                               What to consider:{' '}
                             </strong>
-                            {match.considerations[0] ??
-                              (match.skillsToDevelop.length
+                            {match.skillsToDevelop.length
                                 ? `Skills to develop: ${match.skillsToDevelop
                                     .slice(0, 2)
                                     .join(', ')}.`
-                                : 'Review tasks and education requirements before deciding.')}
+                                : (match.considerations[0] ?? 'Review tasks and education requirements before deciding.')}
                           </div>
 
                           
@@ -498,8 +564,8 @@ export default function RecommendationsView() {
                 {!loadingDetails &&
                   recommended.length === 0 && (
                     <p>
-                      No occupations match this
-                      filter. Try All Fields.
+                      No occupations meet this exploration category yet.
+                      Try another category or All Recommendations.
                     </p>
                   )}
               </>
