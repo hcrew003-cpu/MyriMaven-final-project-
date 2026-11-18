@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Career, UserProfile, WhatIfState, ViewType } from '../types/career';
 import { CAREERS, INITIAL_USER_PROFILE } from '../data/careersData';
 import type { User } from '@supabase/supabase-js';
@@ -31,7 +31,18 @@ export interface OnetCareer {
 type PreferenceKey = keyof UserProfile['preferences'];
 type RankedCareer = Career & { dynamicScore: number; delta: number; scenarioNote: string };
 
+export interface RecommendationNavigation {
+  mode: 'recommended' | 'browse';
+  filter: 'all' | 'creative' | 'business' | 'tech';
+  explorationFilter: 'all' | 'best' | 'related' | 'unexpected';
+  query: string;
+  page: number;
+}
+
 interface CareerContextType {
+  detailReturnView: ViewType;
+  recommendationNavigation: RecommendationNavigation;
+  setRecommendationNavigation: React.Dispatch<React.SetStateAction<RecommendationNavigation>>;
   activeView: ViewType;
   authUser: User | null;
   authLoading: boolean;
@@ -219,7 +230,18 @@ function calculateMatch(
 export function CareerProvider({ children }: { children: React.ReactNode }) {
   const [activeView, setActiveViewState] = useState<ViewType>('landing');
 
+  const currentView = useRef<ViewType>('landing');
+  const [detailReturnView, setDetailReturnView] = useState<ViewType>('recommendations');
+  const [recommendationNavigation, setRecommendationNavigation] = useState<RecommendationNavigation>({
+    mode: 'recommended', filter: 'all', explorationFilter: 'best', query: '', page: 1,
+  });
+
   const setActiveView = useCallback((view: ViewType) => {
+    if (view === 'detail' && currentView.current !== 'detail') {
+      const source = currentView.current;
+      setDetailReturnView(source === 'landing' || source === 'auth' || source === 'onboarding' ? 'recommendations' : source);
+    }
+    currentView.current = view;
     setActiveViewState(view);
     const url = new URL(window.location.href);
     url.hash = view === 'landing' ? '' : view;
@@ -235,8 +257,12 @@ export function CareerProvider({ children }: { children: React.ReactNode }) {
       const view = window.location.hash.replace('#', '') as ViewType;
       return validViews.includes(view) ? view : 'landing';
     };
-    setActiveViewState(getViewFromUrl());
-    const onPopState = () => setActiveViewState(getViewFromUrl());
+    const onPopState = () => {
+      const view = getViewFromUrl();
+      currentView.current = view;
+      setActiveViewState(view);
+    };
+    onPopState();
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -543,6 +569,7 @@ const applyWhatIfScenario = (scenario: {
   return (
     <CareerContext.Provider value={{
       authUser, authLoading, activeView, setActiveView,
+      detailReturnView, recommendationNavigation, setRecommendationNavigation,
       selectedCareerId, setSelectedCareerId, selectedCareer,
       selectedOnetCareer, onetCareerLoading, onetCareerError,
       careerHistory,
