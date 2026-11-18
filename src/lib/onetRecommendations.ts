@@ -187,66 +187,21 @@ const TOPIC_TERMS: Record<string, string[]> = {
 
 
 const BACKGROUND_TERMS: Record<string, string[]> = {
-  business: [
-    'business', 'manager', 'management', 'marketing',
-    'sales', 'operations', 'consultant', 'administrative',
-  ],
-  management: [
-    'manager', 'management', 'supervisor', 'director',
-    'administrator', 'operations', 'project',
-  ],
-  entrepreneurship: [
-    'business', 'marketing', 'sales', 'product',
-    'innovation', 'consultant', 'management',
-  ],
-  finance: [
-    'financial', 'finance', 'account', 'budget',
-    'investment', 'analyst', 'auditor',
-  ],
-  accounting: [
-    'account', 'auditor', 'financial', 'tax',
-    'budget',
-  ],
-  marketing: [
-    'marketing', 'advertis', 'market research',
-    'public relations', 'brand', 'sales',
-  ],
-  psychology: [
-    'psycholog', 'counsel', 'human resources',
-    'social', 'behavior', 'research',
-  ],
-  education: [
-    'teacher', 'education', 'school',
-    'instructor', 'training', 'curriculum',
-  ],
-  engineering: [
-    'engineer', 'technical', 'systems',
-    'design', 'manufacturing',
-  ],
-  computer: [
-    'software', 'computer', 'developer',
-    'programmer', 'data', 'systems',
-  ],
-  nursing: [
-    'nurs', 'health', 'patient',
-    'clinical', 'medical',
-  ],
-  healthcare: [
-    'health', 'medical', 'clinical',
-    'patient', 'care',
-  ],
-  environmental: [
-    'environment', 'conservation', 'ecolog',
-    'sustainab', 'natural resource',
-  ],
-  communication: [
-    'communications', 'public relations',
-    'writer', 'media', 'marketing',
-  ],
-  design: [
-    'design', 'creative', 'graphic',
-    'architect', 'artist',
-  ],
+  business: ['business', 'management analyst', 'marketing', 'sales', 'financial', 'account', 'human resources', 'procurement', 'logistics', 'project management', 'budget', 'auditor', 'compliance', 'administrative services'],
+  management: ['management analyst', 'human resources', 'training and development', 'project management', 'logistics', 'procurement', 'administrative services', 'general manager', 'operations manager', 'business', 'community service manager'],
+  entrepreneurship: ['business development', 'market research', 'marketing', 'sales', 'fundrais', 'project management', 'buyer', 'advertis', 'public relations', 'event planner', 'management analyst', 'business'],
+  finance: ['financial', 'finance', 'account', 'budget', 'investment', 'auditor', 'credit analyst'],
+  accounting: ['account', 'auditor', 'financial', 'tax', 'budget'],
+  marketing: ['marketing', 'advertis', 'market research', 'public relations', 'brand', 'sales'],
+  psychology: ['psycholog', 'counsel', 'behavior', 'mental health', 'human resources', 'social work'],
+  education: ['teacher', 'education', 'school', 'instructor', 'training', 'curriculum'],
+  engineering: ['engineer', 'manufacturing', 'industrial design', 'engineering technician'],
+  computer: ['software', 'computer', 'developer', 'programmer', 'database', 'information systems'],
+  nursing: ['nurs', 'patient care', 'clinical', 'medical'],
+  healthcare: ['health', 'medical', 'clinical', 'patient care'],
+  environmental: ['environment', 'conservation', 'ecolog', 'sustainab', 'natural resource', 'hydrolog', 'wildlife'],
+  communication: ['communications', 'public relations', 'writer', 'media', 'marketing'],
+  design: ['design', 'creative', 'graphic', 'architect', 'artist'],
 };
 
 function getBackgroundTerms(profile: UserProfile): string[] {
@@ -286,7 +241,7 @@ function getBackgroundTerms(profile: UserProfile): string[] {
   ]);
 
   for (const word of background.split(/[^a-z]+/)) {
-    if (word.length >= 5 && !ignored.has(word)) {
+    if (word.length >= 5 && !ignored.has(word) && !GENERIC.has(word) && !BACKGROUND_TERMS[word]) {
       terms.add(word);
     }
   }
@@ -322,6 +277,22 @@ function titleStrength(title: string, terms: string[]): number {
   }, 0);
 }
 
+/**
+ * Separate title-based background signal, not a compatibility percentage.
+ * Only strong, field-specific title connections receive a ranking boost.
+ */
+export function getCareerBackgroundRelevance(
+  career: { title: string },
+  profile: UserProfile
+): { strength: number; matchedTerms: string[] } {
+  const terms = getBackgroundTerms(profile).filter(term => !GENERIC.has(term));
+  const matchedTerms = terms.filter(term => titleStrength(career.title, [term]) === 1);
+  return {
+    strength: matchedTerms.length ? 1 : 0,
+    matchedTerms,
+  };
+}
+
 /** Discovery scores are not compatibility percentages. */
 export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProfile): CatalogCareer[] {
   const interests = [...new Set(profile.interests ?? [])].filter(label => TOPIC_TERMS[label]);
@@ -334,7 +305,7 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
     const interestHits = interests.map(label => titleStrength(title, TOPIC_TERMS[label]));
     const skillHits = skills.map(([name, rating]) => titleStrength(title, SKILL_TERMS[name]) * Number(rating)/5);
     const goalHits = goals.map(goal => titleStrength(title, GOAL_TERMS[goal]));
-    const background = titleStrength(title, backgroundTerms);
+    const background = getCareerBackgroundRelevance(career, profile).strength;
     const strength = (hits: number[]) => 0.6 * Math.max(0,...hits) + 0.4 * mean(hits);
     const score = 4 * strength(interestHits) + 3 * strength(skillHits) + 2 * strength(goalHits) + 1.5 * background;
     return { career, score, interestHits, skillHits, goalHits, background };
@@ -377,6 +348,16 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
     ...goals.map((_,i) => ranked.filter(item => item.goalHits[i]>0)),
     ...(backgroundTerms.length ? [ranked.filter(item => item.background>0)] : []),
   ];
+  // Reserve up to eight slots for background-connected occupations that
+  // also have an interest, skill or goal connection. Do not force a quota.
+  if (backgroundTerms.length) {
+    const connected = ranked.filter(item =>
+      item.background > 0 &&
+      [...item.interestHits, ...item.skillHits, ...item.goalHits].some(hit => hit > 0)
+    );
+    const reservedLimit = Math.min(mainLimit, 8);
+    for (const item of connected) add(item, reservedLimit);
+  }
   roundRobin(pools,mainLimit);
   for (const item of ranked) if (item.score>0) add(item,mainLimit);
   const exploration = Object.keys(TOPIC_TERMS).filter(label => !interests.includes(label)).map(label => ranked.filter(item => titleStrength(item.career.title,TOPIC_TERMS[label])>0));
