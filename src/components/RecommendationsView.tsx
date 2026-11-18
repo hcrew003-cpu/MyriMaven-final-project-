@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { useCareer } from '../context/CareerContext';
 import { useOnetRecommendations } from '../hooks/useOnetRecommendations';
 import {
+  GraduationCap,
   BarChart3,
   Bookmark,
   BookmarkCheck,
@@ -47,6 +48,7 @@ function categoryMatch(
 
 export default function RecommendationsView() {
   const {
+    userProfile,
     setActiveView,
     setSelectedCareerId,
     compareCareerIds,
@@ -73,6 +75,9 @@ export default function RecommendationsView() {
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
+
+  const backgroundLabels = [userProfile.major, userProfile.minor]
+    .filter((value): value is string => Boolean(value?.trim()));
 
   const recommended = rankedCareers.filter(
     ({ career }) => categoryMatch(career.title, filter)
@@ -321,6 +326,12 @@ export default function RecommendationsView() {
                     : `${rankedCareers.length} occupations evaluated from a shortlist drawn from ${catalog.length} available careers.`}
                 </p>
 
+                {userProfile.useCareerBackground === true && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 18 }}>
+                    Career background is enabled. Relevant connections may move occupations higher in the list without changing their estimated match percentages.
+                  </p>
+                )}
+
                 <div
                   style={{
                     display: 'grid',
@@ -330,7 +341,7 @@ export default function RecommendationsView() {
                   }}
                 >
                   {recommended.map(
-                    ({ career, match }) => (
+                    ({ career, match, background }) => (
                       <div
                         key={career.id}
                         className="career-card"
@@ -373,6 +384,21 @@ export default function RecommendationsView() {
                             {match.reasons[0] ??
                               'Limited matching evidence is available; review the occupation details.'}
                           </div>
+
+                          {userProfile.useCareerBackground === true &&
+                            background?.strength > 0 && (
+                              <div className="fit-box" style={{ marginTop: 10 }}>
+                                <strong style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <GraduationCap size={16} /> Background connection
+                                </strong>
+                                <p style={{ marginTop: 6 }}>
+                                  {backgroundLabels.length
+                                    ? `Your studies (${backgroundLabels.join(' / ')}) may connect to this occupation through ${background.matchedTerms.slice(0, 3).join(', ')}.`
+                                    : `Your career background may connect to this occupation through ${background.matchedTerms.slice(0, 3).join(', ')}.`}
+                                  {' '}This is a possible connection, not a qualification assessment.
+                                </p>
+                              </div>
+                            )}
 
                           <div className="watchout-box">
                             <strong>
