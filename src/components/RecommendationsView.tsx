@@ -25,7 +25,7 @@ const EXPLORATION_OPTIONS: [ExplorationFilter, string][] = [
   ['all', 'All Recommendations'],
 ];
 const EXPLORATION_DESCRIPTIONS: Record<ExplorationFilter, string> = {
-  best: 'Your strongest available matches from the evaluated shortlist, ranked using your profile. Review individual estimates and evidence before deciding.',
+  best: 'Your strongest available matches, balancing occupational alignment and overall compatibility. Review individual estimates and evidence before deciding.',
   related: 'Explore careers that build on your interests, strengths or enabled career background.',
   unexpected: 'Discover careers outside your leading occupational fields that still connect to your profile.',
   all: 'View every evaluated occupation, including those with limited matching evidence.',
@@ -93,34 +93,52 @@ export default function RecommendationsView() {
   const backgroundLabels = [userProfile.major, userProfile.minor]
     .filter((value): value is string => Boolean(value?.trim()));
 
-  // Group by evidence patterns and occupational breadth, not total-score bands.
+  // Group by occupational alignment and transferable evidence, not score bands.
   const exploration = useMemo(() => {
     const rows = rankedCareers.map((entry) => {
       const { interests, skills, goals } = entry.match.breakdown;
-      const background = userProfile.useCareerBackground === true && entry.background?.strength > 0;
-      return { entry, interests, skills, goals, background,
-        group: entry.career.id.split('-')[0] };
+      const alignment = entry.match.occupationalAlignment ?? interests ?? 0;
+      const interestCount = entry.match.matchedInterests?.length ?? 0;
+      const skill = skills ?? 0;
+      const goal = goals ?? 0;
+      const background = userProfile.useCareerBackground === true
+        ? (entry.background?.strength ?? 0) : 0;
+      // Skills and goals support discovery, but do not replace occupational relevance.
+      const personal = Math.max(alignment, skill * 0.8, goal * 0.65);
+      const support = alignment * 0.45 + skill * 0.35 + goal * 0.20;
+      const bestRank = entry.match.score * 0.55 + alignment * 0.45 + background * 6;
+      const group = entry.career.id.split('-')[0];
+      const family = entry.career.id.split('.')[0].slice(0, 5);
+      return { entry, alignment, interestCount, skill, goal, background,
+        personal, support, bestRank, group, family };
     });
-    // Keep the profile-informed ranking, even when absolute scores are modest.
-    const best = rows.slice(0, 12);
-    const leadingGroups = new Set(
-      (best.length ? best.slice(0, 6) : rows.slice(0, 6)).map(row => row.group)
-    );
+    type Row = (typeof rows)[number];
+    const diverse = (pool: Row[], limit: number, familyLimit: number) => {
+      const result: Row[] = [];
+      const counts = new Map<string, number>();
+      for (const row of pool) {
+        if ((counts.get(row.family) ?? 0) >= familyLimit) continue;
+        result.push(row);
+        counts.set(row.family, (counts.get(row.family) ?? 0) + 1);
+        if (result.length === limit) break;
+      }
+      return result;
+    };
+    const bestPool = [...rows].sort((a, b) => b.bestRank - a.bestRank || b.entry.match.score - a.entry.match.score);
+    const best = diverse(bestPool.filter(row => row.personal >= 15 && row.entry.match.reasons.length > 0), 12, 2);
+    const leadingGroups = new Set(best.slice(0, 6).map(row => row.group));
     const bestIds = new Set(best.map(row => row.entry.career.id));
     const remaining = rows.filter(row => !bestIds.has(row.entry.career.id));
-    // Require personal relevance independently of educational background.
-    const relevance = (row: typeof rows[number]) => Math.max(row.interests ?? 0, row.goals ?? 0);
-    const peak = Math.max(0, ...rows.map(relevance));
-    const threshold = Math.max(15, peak * 0.4);
-    const eligible = remaining.filter(row => relevance(row) >= threshold &&
-      row.entry.match.reasons.length > 0);
-    const unexpected = eligible.filter(row => !leadingGroups.has(row.group) && !row.background)
-      .sort((a, b) => relevance(b) - relevance(a) || b.entry.match.score - a.entry.match.score)
-      .slice(0, 8);
-    const unexpectedIds = new Set(unexpected.map(row => row.entry.career.id));
-    const related = eligible.filter(row => !unexpectedIds.has(row.entry.career.id))
-      .sort((a, b) => (relevance(b) + (b.background ? 8 : 0)) - (relevance(a) + (a.background ? 8 : 0)) || b.entry.match.score - a.entry.match.score)
-      .slice(0, 12);
+    const peak = Math.max(0, ...rows.map(row => row.personal));
+    const threshold = Math.max(20, peak * 0.4);
+    const eligible = remaining.filter(row => row.personal >= threshold && row.entry.match.reasons.length > 0);
+    const relatedRank = (row: Row) => row.support + row.entry.match.score * 0.35 + row.background * 8;
+    const related = diverse(eligible.filter(row => leadingGroups.has(row.group) || row.background > 0 || row.interestCount >= 2)
+      .sort((a, b) => relatedRank(b) - relatedRank(a)), 12, 2);
+    const relatedIds = new Set(related.map(row => row.entry.career.id));
+    const unexpectedRank = (row: Row) => row.personal * 0.45 + row.support * 0.25 + row.entry.match.score * 0.30;
+    const unexpected = diverse(eligible.filter(row => !relatedIds.has(row.entry.career.id) && !leadingGroups.has(row.group) && row.background === 0 && (row.alignment >= 25 || row.skill >= 40))
+      .sort((a, b) => unexpectedRank(b) - unexpectedRank(a)), 8, 1);
     return {
       all: rankedCareers,
       best: best.map(row => row.entry),
