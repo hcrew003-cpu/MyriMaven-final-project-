@@ -1,4 +1,3 @@
-
 import type { UserProfile, WhatIfState } from '../types/career';
 import type { OnetCareer } from '../context/CareerContext';
 
@@ -10,6 +9,9 @@ export interface OnetMatchResult {
   skillsToDevelop: string[];
   occupationalAlignment?: number;
   matchedInterests?: string[];
+  coreInterestMatches?: string[];
+  dutyInterestScores?: Record<string, number>;
+  goalAlignment?: number | null;
   breakdown: {
     interests: number | null;
     skills: number | null;
@@ -37,36 +39,55 @@ const INTEREST_TERMS: Record<string, string[]> = {
     'business administration', 'business strategy', 'marketing',
     'sales', 'finance', 'accounting', 'human resources',
     'market research', 'procurement', 'supply chain',
-    'management analysis', 'budgeting', 'business development', 'project management', 'business operations', 'organizational strategy', 'market demand', 'consumer research', 'marketing policies',
+    'management analysis', 'budgeting', 'business development',
+    'project management', 'business operations',
+    'organizational strategy', 'market demand',
+    'consumer research', 'marketing policies',
   ],
   'Helping People': [
     'counsel', 'patient', 'community outreach',
     'social service', 'assist clients', 'rehabilitation',
-    'support individuals', 'mental health', 'advocacy', 'social work', 'therapy', 'psycholog', 'client support', 'behavioral health',
+    'support individuals', 'mental health', 'advocacy',
+    'social work', 'therapy', 'psycholog', 'client support',
+    'behavioral health',
   ],
   Creativity: [
     'design', 'artistic', 'creative',
-    'advertising', 'visual', 'originality', 'promotional campaigns', 'creative concepts', 'brand strategy', 'content creation',
+    'advertising', 'visual', 'originality',
+    'promotional campaigns', 'creative concepts',
+    'brand strategy', 'content creation',
   ],
   Environment: [
     'environmental', 'ecology', 'conservation',
-    'sustainability', 'natural resources', 'ecosystem', 'habitat', 'pollution', 'environment', 'soil conservation', 'restoration', 'wildlife', 'natural environment',
+    'sustainability', 'natural resources', 'ecosystem',
+    'habitat', 'pollution', 'environment',
+    'soil conservation', 'restoration', 'wildlife',
+    'natural environment',
   ],
   'Problem Solving': [
     'problem solving', 'troubleshooting',
-    'critical thinking', 'diagnos', 'problem resolution', 'evaluate alternatives', 'assessment', 'identify problems', 'decision making',
+    'critical thinking', 'diagnos', 'problem resolution',
+    'evaluate alternatives', 'assessment',
+    'identify problems', 'decision making',
   ],
   Leadership: [
     'manage', 'supervis', 'leadership',
-    'direct operations', 'coordinate teams', 'project management', 'lead teams', 'staff development',
+    'direct operations', 'coordinate teams',
+    'project management', 'lead teams', 'staff development',
   ],
   'Working with Data': [
     'data analysis', 'statistics', 'analytics',
-    'data collection', 'quantitative', 'statistical analysis', 'analyze data', 'interpret data', 'modeling', 'survey data',
+    'data collection', 'quantitative', 'statistical analysis',
+    'analyze data', 'interpret data', 'modeling', 'survey data',
   ],
   Communication: [
     'public speaking', 'writing', 'presentation',
-    'interpersonal communication', 'negotiation', 'interview', 'active listening', 'public relations', 'oral expression', 'explain information', 'advise clients', 'train employees', 'present findings', 'marketing communications', 'promotional campaigns', 'media relations',
+    'interpersonal communication', 'negotiation',
+    'interview', 'active listening', 'public relations',
+    'oral expression', 'explain information', 'advise clients',
+    'train employees', 'present findings',
+    'marketing communications', 'promotional campaigns',
+    'media relations',
   ],
   'Working with Children': [
     'children', 'child development',
@@ -78,7 +99,9 @@ const INTEREST_TERMS: Record<string, string[]> = {
   ],
   Entrepreneurship: [
     'business development', 'entrepreneur',
-    'startup', 'business strategy', 'market opportunities', 'new products', 'product development', 'business plans', 'market research', 'innovation',
+    'startup', 'business strategy', 'market opportunities',
+    'new products', 'product development', 'business plans',
+    'market research', 'innovation',
   ],
 };
 
@@ -97,11 +120,13 @@ const SKILL_TERMS: Record<string, string[]> = {
   ],
   'Problem Solving': [
     'complex problem solving',
-    'critical thinking', 'troubleshooting', 'decision making', 'problem resolution',
+    'critical thinking', 'troubleshooting',
+    'decision making', 'problem resolution',
   ],
   Research: [
     'research', 'information gathering',
-    'investigation', 'collect data', 'review literature', 'evaluate evidence', 'scientific inquiry',
+    'investigation', 'collect data', 'review literature',
+    'evaluate evidence', 'scientific inquiry',
   ],
   Creativity: [
     'design', 'originality', 'creative thinking',
@@ -109,7 +134,8 @@ const SKILL_TERMS: Record<string, string[]> = {
   ],
   Teamwork: [
     'coordination', 'collaboration',
-    'working with others', 'work as a team', 'teamwork', 'collaborate',
+    'working with others', 'work as a team',
+    'teamwork', 'collaborate',
   ],
   'Analytical Thinking': [
     'analysis', 'mathematics',
@@ -119,24 +145,28 @@ const SKILL_TERMS: Record<string, string[]> = {
 
 const GOAL_TERMS: Record<string, string[]> = {
   Growth: [
-    'training', 'professional development',
-    'learning', 'advancement',
+    'professional development',
+    'continuing education',
+    'continuing professional development',
   ],
   Leadership: [
     'management', 'supervis',
     'leadership', 'direct operations',
   ],
   'Helping others': [
-    'patient', 'community', 'counsel',
-    'social service', 'teach', 'assist clients',
+    'patient care', 'counsel', 'community outreach',
+    'social service', 'teach', 'rehabilitation',
+    'advocacy', 'social work', 'provide care',
   ],
   Creativity: [
     'design', 'creative', 'artistic',
     'originality',
   ],
   'Making an impact': [
-    'community', 'conservation',
-    'public health', 'social service',
+    'community outreach', 'conservation',
+    'environmental protection', 'public health',
+    'social service', 'public safety',
+    'pollution prevention',
   ],
 };
 
@@ -237,25 +267,41 @@ function evidenceStrength(
   const descriptionMatches = matchingTerms(
     sections.description, terms
   );
+
   const taskMatches = matchingTerms(sections.tasks, terms);
   const skillMatches = matchingTerms(sections.skills, terms);
   const knowledgeMatches = matchingTerms(
     sections.knowledge, terms
   );
 
-  // Multiple distinct duty signals are stronger than isolated mentions.
-  const coverage = (hits: string[]) => hits.length === 0 ? 0 : hits.length === 1 ? 0.65 : hits.length === 2 ? 0.85 : 1;
+  // Multiple distinct duty signals are stronger
+  // than isolated mentions.
+  const coverage = (hits: string[]) =>
+    hits.length === 0
+      ? 0
+      : hits.length === 1
+        ? 0.65
+        : hits.length === 2
+          ? 0.85
+          : 1;
+
   const earned =
     45 * coverage(descriptionMatches) +
     35 * coverage(taskMatches) +
     15 * coverage(skillMatches) +
     5 * coverage(knowledgeMatches);
 
-  const available = (sections.description ? 45 : 0) +
-    (sections.tasks ? 35 : 0) + (sections.skills ? 15 : 0) +
+  const available =
+    (sections.description ? 45 : 0) +
+    (sections.tasks ? 35 : 0) +
+    (sections.skills ? 15 : 0) +
     (sections.knowledge ? 5 : 0);
-  // Do not penalize missing minor sources; avoid amplifying sparse records.
-  const score = Math.round(earned / Math.max(80, available) * 100);
+
+  // Do not penalize missing minor sources;
+  // avoid amplifying sparse records.
+  const score = Math.round(
+    earned / Math.max(80, available) * 100
+  );
 
   return {
     score,
@@ -270,37 +316,118 @@ function evidenceStrength(
   };
 }
 
-// Direct occupational evidence is intentionally distinct from transferable skills.
-function interestEvidence(sections: Sections, terms: readonly string[]) {
+// Direct occupational evidence is intentionally
+// distinct from transferable skills.
+function interestEvidence(
+  sections: Sections,
+  terms: readonly string[]
+) {
   const title = matchingTerms(sections.title, terms);
   const description = matchingTerms(sections.description, terms);
   const tasks = matchingTerms(sections.tasks, terms);
   const knowledge = matchingTerms(sections.knowledge, terms);
-  const coverage = (hits: string[]) => Math.min(1, hits.length / 2 + (hits.length ? 0.2 : 0));
-  const score = clamp(Math.round(20 * coverage(title) + 35 * coverage(description) + 35 * coverage(tasks) + 10 * coverage(knowledge)));
-  return { score, evidence: [...new Set([...description, ...tasks, ...title, ...knowledge])] };
+
+  const coverage = (hits: string[]) =>
+    Math.min(1, hits.length / 2 + (hits.length ? 0.2 : 0));
+
+  const score = clamp(
+    Math.round(
+      20 * coverage(title) +
+      35 * coverage(description) +
+      35 * coverage(tasks) +
+      10 * coverage(knowledge)
+    )
+  );
+
+  return {
+    score,
+    evidence: [
+      ...new Set([
+        ...description,
+        ...tasks,
+        ...title,
+        ...knowledge,
+      ]),
+    ],
+  };
 }
 
-// Explicit crosswalk to O*NET skill names; not a professional qualification test.
+// Explicit crosswalk to O*NET skill names;
+// not a professional qualification test.
 const DIRECT_SKILLS: Record<string, string[]> = {
-  Communication: ['active listening', 'speaking', 'writing', 'reading comprehension', 'negotiation', 'persuasion'],
-  Leadership: ['management of personnel resources', 'instructing', 'coordination'],
-  Organization: ['time management', 'coordination', 'management of material resources'],
-  'Problem Solving': ['complex problem solving', 'critical thinking', 'judgment and decision making', 'troubleshooting'],
-  Research: ['science', 'active learning', 'reading comprehension'],
-  Creativity: ['technology design'],
-  Teamwork: ['coordination', 'social perceptiveness', 'active listening'],
-  'Analytical Thinking': ['mathematics', 'critical thinking', 'systems analysis', 'systems evaluation', 'judgment and decision making'],
+  Communication: [
+    'active listening', 'speaking', 'writing',
+    'reading comprehension', 'negotiation', 'persuasion',
+  ],
+  Leadership: [
+    'management of personnel resources',
+    'instructing', 'coordination',
+  ],
+  Organization: [
+    'time management', 'coordination',
+    'management of material resources',
+  ],
+  'Problem Solving': [
+    'complex problem solving', 'critical thinking',
+    'judgment and decision making', 'troubleshooting',
+  ],
+  Research: [
+    'science', 'active learning', 'reading comprehension',
+  ],
+  Creativity: [
+    'technology design',
+  ],
+  Teamwork: [
+    'coordination', 'social perceptiveness', 'active listening',
+  ],
+  'Analytical Thinking': [
+    'mathematics', 'critical thinking', 'systems analysis',
+    'systems evaluation', 'judgment and decision making',
+  ],
 };
 
 function readableEvidence(terms: string[]): string {
   const labels: Record<string, string> = {
-    counsel: 'counseling', psycholog: 'psychology', diagnos: 'diagnostic work',
-    supervis: 'supervision', manage: 'management', nurs: 'nursing',
-    patient: 'patient care', teach: 'teaching', interview: 'interviewing',
-    design: 'design work', creative: 'creative work', artistic: 'artistic work', environmental: 'environmental work', quantitative: 'quantitative analysis', 'assist clients': 'client assistance',
+    counsel: 'counseling',
+    psycholog: 'psychology',
+    diagnos: 'diagnostic work',
+    supervis: 'supervision',
+    manage: 'management',
+    nurs: 'nursing',
+    patient: 'patient care',
+    teach: 'teaching',
+    interview: 'interviewing',
+    design: 'design work',
+    creative: 'creative work',
+    artistic: 'artistic work',
+    environmental: 'environmental work',
+    environment: 'environmental work',
+    'natural environment': 'environmental work',
+    quantitative: 'quantitative analysis',
+    'assist clients': 'client assistance',
+    'marketing policies': 'marketing strategy',
   };
-  return [...new Set(terms.map(term => labels[term] ?? term))].slice(0, 2).join(' and ');
+
+  const unique = [
+    ...new Set(
+      terms.map(term => labels[term] ?? term)
+    ),
+  ];
+
+  // Avoid combining overlapping phrases such as
+  // marketing and marketing strategy.
+  const distinct = unique.filter((term, index) =>
+    !unique.some(
+      (other, otherIndex) =>
+        otherIndex !== index &&
+        other.length > term.length &&
+        other.includes(term)
+    )
+  );
+
+  return (distinct.length ? distinct : unique)
+    .slice(0, 2)
+    .join(' and ');
 }
 
 function average(values: number[]): number | null {
@@ -358,6 +485,7 @@ function calculatePreferenceMatch(
       (high.score / (low.score + high.score)) * 100;
 
     const rawPreference = Number(preferences[key] ?? 50);
+
     const userPosition = clamp(
       Number.isFinite(rawPreference) ? rawPreference : 50
     );
@@ -428,14 +556,13 @@ function responsePosition(
 ): number | null {
   const value = description.toLowerCase().trim();
 
-  
-if (category === 'teamwork') {
-  if (value.includes('not important')) return 0;
-  if (value.includes('somewhat important')) return 35;
-  if (value.includes('extremely important')) return 100;
-  if (value.includes('very important')) return 80;
-  if (value.includes('important')) return 60;
-}
+  if (category === 'teamwork') {
+    if (value.includes('not important')) return 0;
+    if (value.includes('somewhat important')) return 35;
+    if (value.includes('extremely important')) return 100;
+    if (value.includes('very important')) return 80;
+    if (value.includes('important')) return 60;
+  }
 
   if (category === 'freedom') {
     if (value.includes('a lot of freedom')) return 100;
@@ -459,7 +586,6 @@ if (category === 'teamwork') {
 
 // Exploratory location flexibility indicators from O*NET duties.
 // These are NOT employer remote-work policies or verified job arrangements.
-// Patterns intentionally match ordinary task wording rather than a few exact phrases.
 const ON_SITE_DUTY_PATTERNS: RegExp[] = [
   /\b(?:patient|patients|resident|residents|client|clients)\b.{0,65}\b(?:examin|treat|care|assist|monitor|transport|administer|physical)\w*/i,
   /\b(?:examin|treat|care for|assist|monitor|transport|administer)\w*\b.{0,65}\b(?:patient|patients|resident|residents)\b/i,
@@ -474,8 +600,8 @@ const ON_SITE_DUTY_PATTERNS: RegExp[] = [
   /\b(?:teach|instruct|supervise)\w*\b.{0,55}\b(?:classrooms?|students?|children|pupils)\b/i,
 ];
 
-// Digital/desk-based duties may be more location-flexible, but they do not
-// establish that a job is remote or hybrid. Use a smaller scoring effect.
+// Digital/desk-based duties may be more location-flexible,
+// but they do not establish that a job is remote or hybrid.
 const DIGITAL_DUTY_PATTERNS: RegExp[] = [
   /\b(?:analy[sz]|interpret|model|forecast|research|evaluate|review)\w*\b.{0,70}\b(?:data|information|reports?|financial|statistics|trends|markets?)\b/i,
   /\b(?:develop|design|write|maintain|test|debug|program)\w*\b.{0,70}\b(?:software|code|applications?|websites?|digital|databases?|systems?)\b/i,
@@ -486,22 +612,36 @@ const DIGITAL_DUTY_PATTERNS: RegExp[] = [
 function calculateWorkLocationPreference(
   sections: Sections,
   preferences: Preferences
-): { score: number | null; reason: string | null } {
+): {
+  score: number | null;
+  reason: string | null;
+} {
   const duties = `${sections.description} ${sections.tasks}`;
-  const onsite = ON_SITE_DUTY_PATTERNS.filter((pattern) => pattern.test(duties)).length;
-  const digital = DIGITAL_DUTY_PATTERNS.filter((pattern) => pattern.test(duties)).length;
+
+  const onsite = ON_SITE_DUTY_PATTERNS.filter(
+    (pattern) => pattern.test(duties)
+  ).length;
+
+  const digital = DIGITAL_DUTY_PATTERNS.filter(
+    (pattern) => pattern.test(duties)
+  ).length;
 
   if (onsite === 0 && digital === 0) {
     return { score: null, reason: null };
   }
 
   const raw = Number(preferences.officeVsRemote ?? 50);
-  const remotePreference = clamp(Number.isFinite(raw) ? raw : 50);
 
-  if (isNeutralPreference(remotePreference)) return { score: null, reason: null };
+  const remotePreference = clamp(
+    Number.isFinite(raw) ? raw : 50
+  );
 
-  // If both kinds of duties appear, prefer caution: physical presence may
-  // still be necessary. This is a heuristic, not a remote eligibility test.
+  if (isNeutralPreference(remotePreference)) {
+    return { score: null, reason: null };
+  }
+
+  // If both kinds of duties appear, prefer caution:
+  // physical presence may still be necessary.
   if (onsite > 0) {
     return {
       score: Math.round(100 - remotePreference * 0.7),
@@ -596,14 +736,12 @@ function calculateWorkContextPreferences(
         (sum, response) =>
           sum +
           response.percentage *
-            (response.position as number),
+          (response.position as number),
         0
       ) / totalPercentage;
 
     // Work Pace slider:
     // 0 = fast-paced, 100 = predictable.
-    // More frequent deadlines are treated as
-    // evidence of greater time pressure.
     const occupationPosition =
       dimension.category === 'deadlines'
         ? 100 - measuredPosition
@@ -647,36 +785,68 @@ export function calculateOnetMatch(
   const sections = getOccupationSections(career);
 
   const reasons: string[] = [];
-  const rankedReasons: { text: string; strength: number }[] = [];
+  const rankedReasons: {
+    text: string;
+    strength: number;
+  }[] = [];
+
   const considerations: string[] = [];
   const skillsToDevelop: string[] = [];
 
   // INTERESTS
   const interestScores: number[] = [];
   const matchedInterests: string[] = [];
+  const coreInterestMatches: string[] = [];
+  const dutyInterestScores: Record<string, number> = {};
 
-  for (const interest of new Set((scenarioProfile?.interests ?? profile.interests) ?? [])) {
+  // Broad transferable interests are distinguished
+  // from more occupation-specific interests.
+  const broadInterests = new Set([
+    'Communication',
+    'Problem Solving',
+    'Leadership',
+  ]);
+
+  for (
+    const interest of new Set(
+      (scenarioProfile?.interests ?? profile.interests) ?? []
+    )
+  ) {
     const terms = INTEREST_TERMS[interest] ?? [
       normalize(interest),
     ];
 
     const evidence = interestEvidence(sections, terms);
+
     interestScores.push(evidence.score);
-    if (evidence.score >= 35) matchedInterests.push(interest);
+
+    const dutyEvidence = interestEvidence(
+      { ...sections, knowledge: '' },
+      terms
+    );
+
+    dutyInterestScores[interest] = dutyEvidence.score;
+
+    if (
+      !broadInterests.has(interest) &&
+      dutyEvidence.score >= 45
+    ) {
+      coreInterestMatches.push(interest);
+    }
 
     if (evidence.score >= 35) {
+      matchedInterests.push(interest);
+
       rankedReasons.push({
-        text: `Your interest in ${interest.toLowerCase()} aligns with occupation-specific activities such as ${readableEvidence(evidence.evidence)}.`,
+        text: `Your interest in ${interest.toLowerCase()} aligns with work involving ${readableEvidence(evidence.evidence)}.`,
         strength: evidence.score + 15,
       });
     }
   }
 
-  
   // INTEREST SCORING
   // Give more importance to the student's strongest
   // connections while still considering all interests.
-
   const interestScore = (() => {
     if (interestScores.length === 0) return null;
 
@@ -684,35 +854,38 @@ export function calculateOnetMatch(
       (a, b) => b - a
     );
 
-    // Average the strongest two interest connections.
     const strongestScores = sortedScores.slice(0, 2);
 
     const strongestAverage =
       strongestScores.reduce((sum, score) => sum + score, 0) /
       strongestScores.length;
 
-    // Keep all selected interests in the calculation.
     const overallAverage =
       interestScores.reduce((sum, score) => sum + score, 0) /
       interestScores.length;
 
-    // Strong connections receive more weight,
-    // but weaker connections still matter.
     return Math.round(
       strongestAverage * 0.50 +
       overallAverage * 0.50
     );
   })();
 
-
   // SKILLS
   const skillScores: number[] = [];
   const skillWeights: number[] = [];
 
-  for (const [skillName, rawRating] of Object.entries(
-    scenarioProfile?.skills ?? profile.skills ?? {}
-  )) {
-    if (typeof rawRating !== 'number' || !Number.isFinite(rawRating) || rawRating < 1) continue;
+  for (
+    const [skillName, rawRating] of Object.entries(
+      scenarioProfile?.skills ?? profile.skills ?? {}
+    )
+  ) {
+    if (
+      typeof rawRating !== 'number' ||
+      !Number.isFinite(rawRating) ||
+      rawRating < 1
+    ) {
+      continue;
+    }
 
     const terms = SKILL_TERMS[skillName] ?? [
       normalize(skillName),
@@ -720,31 +893,68 @@ export function calculateOnetMatch(
 
     const evidence = evidenceStrength(sections, terms);
 
-    const directNames = new Set((DIRECT_SKILLS[skillName] ?? []).map(normalize));
-    const direct = (career.skills?.element ?? []).filter(skill => directNames.has(normalize(skill.name)));
-    const relevance = Math.max(evidence.score, direct.length ? 45 : 0);
+    const directNames = new Set(
+      (DIRECT_SKILLS[skillName] ?? []).map(normalize)
+    );
+
+    const direct = (career.skills?.element ?? []).filter(
+      skill => directNames.has(normalize(skill.name))
+    );
+
+    const relevance = Math.max(
+      evidence.score,
+      direct.length ? 45 : 0
+    );
+
     if (relevance < 15) continue;
 
     const rating = clamp(rawRating, 1, 5);
     const readiness = ((rating - 1) / 4) * 100;
 
-    // Readiness matters only to the extent that the occupation uses the skill.
+    // Readiness matters only to the extent that
+    // the occupation uses the skill.
     skillScores.push(readiness);
     skillWeights.push(relevance);
 
     if (rating >= 4 && relevance >= 45) {
       rankedReasons.push({
-        text: `Your self-rated strength in ${skillName.toLowerCase()} may support work involving ${readableEvidence(direct.length ? direct.map(skill => skill.name.toLowerCase()) : evidence.evidence)}.`,
+        text: `Your self-rated strength in ${skillName.toLowerCase()} may support work involving ${readableEvidence(
+          direct.length
+            ? direct.map(skill => skill.name.toLowerCase())
+            : evidence.evidence
+        )}.`,
         strength: relevance * readiness / 100,
       });
-    } else if (rating <= 3 && (direct.length >= 2 || (evidence.score >= 55 &&
-      matchingTerms(`${sections.description} ${sections.tasks}`, terms).length >= 2))) {
+    } else if (
+      rating <= 2 &&
+      (
+        direct.length >= 2 ||
+        (
+          evidence.score >= 55 &&
+          matchingTerms(
+            `${sections.description} ${sections.tasks}`,
+            terms
+          ).length >= 2
+        )
+      )
+    ) {
+      // A moderate self-rating is not automatically
+      // treated as a skill deficiency.
       skillsToDevelop.push(skillName);
     }
   }
 
-  const skillWeight = skillWeights.reduce((sum, weight) => sum + weight, 0);
-  const skillScore = skillWeight ? skillScores.reduce((sum, value, i) => sum + value * skillWeights[i], 0) / skillWeight : null;
+  const skillWeight = skillWeights.reduce(
+    (sum, weight) => sum + weight,
+    0
+  );
+
+  const skillScore = skillWeight
+    ? skillScores.reduce(
+        (sum, value, i) => sum + value * skillWeights[i],
+        0
+      ) / skillWeight
+    : null;
 
   // WORK PREFERENCES
   // Baseline uses saved preferences.
@@ -757,47 +967,70 @@ export function calculateOnetMatch(
     selectedPreferences
   );
 
-  
-const workContextResult =
-  calculateWorkContextPreferences(
+  const workContextResult = calculateWorkContextPreferences(
     career,
     selectedPreferences
   );
 
-const workLocationResult = calculateWorkLocationPreference(
-  sections,
-  selectedPreferences
-);
+  const workLocationResult = calculateWorkLocationPreference(
+    sections,
+    selectedPreferences
+  );
 
-const combinedPreferenceScores = [
-  ...(workLocationResult.score === null ? [] : [workLocationResult.score]),
-  ...preferenceResult.scores,
-  ...workContextResult.scores,
-];
+  const combinedPreferenceScores = [
+    ...(
+      workLocationResult.score === null
+        ? []
+        : [workLocationResult.score]
+    ),
+    ...preferenceResult.scores,
+    ...workContextResult.scores,
+  ];
 
-const preferenceScore = average(
-  combinedPreferenceScores
-);
-
+  const preferenceScore = average(
+    combinedPreferenceScores
+  );
 
   if (preferenceScore !== null) {
     reasons.push(
-  ...preferenceResult.reasons,
-  ...workContextResult.reasons,
-  ...(workLocationResult.reason ? [workLocationResult.reason] : [])
-);
+      ...preferenceResult.reasons,
+      ...workContextResult.reasons,
+      ...(
+        workLocationResult.reason
+          ? [workLocationResult.reason]
+          : []
+      )
+    );
   }
 
-  const locationPreference = Number(selectedPreferences.officeVsRemote ?? 50);
-  if (locationPreference > 60 && workLocationResult.reason &&
-      workLocationResult.score !== null && workLocationResult.score < 70) {
+  const locationPreference = Number(
+    selectedPreferences.officeVsRemote ?? 50
+  );
+
+  if (
+    locationPreference > 60 &&
+    workLocationResult.reason &&
+    workLocationResult.score !== null &&
+    workLocationResult.score < 70
+  ) {
     considerations.push(workLocationResult.reason);
   }
+
   if (skillsToDevelop.length) {
-    considerations.push(`Skills to develop: ${[...new Set(skillsToDevelop)].slice(0, 2).join(', ')}.`);
+    considerations.push(
+      `Skills to develop: ${[
+        ...new Set(skillsToDevelop),
+      ].slice(0, 2).join(', ')}.`
+    );
   }
-  if (combinedPreferenceScores.some(value => value < 50) && considerations.length === 0) {
-    considerations.push('Some work preferences may differ from this occupation’s typical duties or surveyed working conditions. Review the preference breakdown and full profile.');
+
+  if (
+    combinedPreferenceScores.some(value => value < 50) &&
+    considerations.length === 0
+  ) {
+    considerations.push(
+      'Some work preferences may differ from this occupation’s typical duties or surveyed working conditions. Review the preference breakdown and full profile.'
+    );
   }
 
   // GOALS
@@ -812,6 +1045,7 @@ const preferenceScore = average(
     : profile.goals ?? [];
 
   const goalScores: number[] = [];
+  const unsupportedGoals: string[] = [];
 
   for (const rawGoal of selectedGoals) {
     const goal = normalizeGoal(rawGoal);
@@ -819,9 +1053,20 @@ const preferenceScore = average(
 
     // Unsupported goals are excluded rather than
     // assigned an invented earnings or schedule score.
-    if (!terms) continue;
+    // Advancement opportunities depend on employers,
+    // not whether an occupation includes training duties.
+    if (!terms || goal === 'Growth') {
+      unsupportedGoals.push(
+        goal === 'Growth'
+          ? 'Growth & Advancement'
+          : rawGoal
+      );
+
+      continue;
+    }
 
     const evidence = evidenceStrength(sections, terms);
+
     goalScores.push(evidence.score);
 
     if (evidence.score >= 35) {
@@ -857,9 +1102,11 @@ const preferenceScore = average(
   let earned = 0;
   let availableWeight = 0;
 
-  for (const category of Object.keys(
-    CATEGORY_WEIGHTS
-  ) as MatchCategory[]) {
+  for (
+    const category of Object.keys(
+      CATEGORY_WEIGHTS
+    ) as MatchCategory[]
+  ) {
     const categoryScore = breakdown[category];
 
     if (categoryScore === null) continue;
@@ -882,11 +1129,19 @@ const preferenceScore = average(
         ? 'moderate'
         : 'limited';
 
-  const hasActivePreference = Object.values(selectedPreferences).some(
-    value => typeof value === 'number' && Number.isFinite(value) && !isNeutralPreference(clamp(value))
+  const hasActivePreference = Object.values(
+    selectedPreferences
+  ).some(
+    value =>
+      typeof value === 'number' &&
+      Number.isFinite(value) &&
+      !isNeutralPreference(clamp(value))
   );
+
   if (preferenceScore === null && hasActivePreference) {
-    considerations.push('Available occupation information did not provide enough evidence to evaluate your selected work preferences.');
+    considerations.push(
+      'Available occupation information did not provide enough evidence to evaluate your selected work preferences.'
+    );
   }
 
   if (skillScore === null) {
@@ -895,9 +1150,11 @@ const preferenceScore = average(
     );
   }
 
-  if (goalScore === null) {
+  if (unsupportedGoals.length) {
     considerations.push(
-      'Some goals, including salary, stability, and work-life balance, require additional information.'
+      `Not scored: ${[
+        ...new Set(unsupportedGoals),
+      ].join(', ')}. Available occupation data cannot reliably establish these outcomes; check employer and local labour market information.`
     );
   }
 
@@ -907,21 +1164,51 @@ const preferenceScore = average(
     );
   }
 
+  // EDUCATION
   const education = (career.education?.response ?? [])
-    .filter(item => typeof item.title === 'string' && Number.isFinite(item.percentage_of_respondents))
-    .sort((a, b) => b.percentage_of_respondents - a.percentage_of_respondents)[0];
-  if (education && education.percentage_of_respondents > 0) {
-    considerations.unshift(`Education: ${Math.round(education.percentage_of_respondents)}% of O*NET respondents reported ${education.title.toLowerCase()} as the required education level. Check local requirements.`);
+    .filter(
+      item =>
+        typeof item.title === 'string' &&
+        Number.isFinite(item.percentage_of_respondents)
+    )
+    .sort(
+      (a, b) =>
+        b.percentage_of_respondents -
+        a.percentage_of_respondents
+    )[0];
+
+  if (
+    education &&
+    education.percentage_of_respondents > 0
+  ) {
+    considerations.unshift(
+      `Education: ${Math.round(education.percentage_of_respondents)}% of O*NET respondents reported ${education.title.toLowerCase()} as the required education level. Check local requirements.`
+    );
   }
 
   return {
     score: clamp(score),
     occupationalAlignment: interestScore ?? 0,
     matchedInterests,
+    coreInterestMatches,
+    dutyInterestScores,
+    goalAlignment:
+      goalScore === null
+        ? null
+        : Math.round(goalScore),
     confidence,
-    reasons: [...new Set([...rankedReasons.sort((a, b) => b.strength - a.strength).map(item => item.text), ...reasons])].slice(0, 5),
+    reasons: [
+      ...new Set([
+        ...rankedReasons
+          .sort((a, b) => b.strength - a.strength)
+          .map(item => item.text),
+        ...reasons,
+      ]),
+    ].slice(0, 5),
     considerations: [...new Set(considerations)],
-    skillsToDevelop: [...new Set(skillsToDevelop)].slice(0, 6),
+    skillsToDevelop: [
+      ...new Set(skillsToDevelop),
+    ].slice(0, 6),
     breakdown,
   };
 }
