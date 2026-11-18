@@ -13,6 +13,7 @@ export const DETAIL_LIMIT = 60;
 
 const TOPIC_TERMS: Record<string, string[]> = {
   Technology: [
+    'informatics', 'software quality', 'information systems',
     'software', 'computer', 'network',
     'information technology', 'cyber',
     'web', 'developer', 'programmer',
@@ -34,10 +35,13 @@ const TOPIC_TERMS: Record<string, string[]> = {
     'supply chain', 'budget', 'auditor',
     'compensation', 'training specialist',
     'administrative services',
-    'business intelligence',
+    'business intelligence', 'recruit', 'human resources specialist',
+    'buyer', 'procurement', 'financial analyst', 'credit analyst',
+    'insurance', 'compliance', 'fundrais', 'event planner', 'cost estimator',
   ],
 
   'Helping People': [
+    'case worker', 'community health worker', 'human resources specialist',
     'counsel', 'social work', 'social service',
     'therap', 'health', 'care',
     'teacher', 'advisor', 'advocate',
@@ -50,6 +54,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
   ],
 
   Creativity: [
+    'copywriter', 'set designer', 'technical writer',
     'design', 'artist', 'writer',
     'media', 'advertis', 'creative',
     'architect', 'graphic',
@@ -63,6 +68,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
   ],
 
   Environment: [
+    'conservation scientist', 'environmental economist', 'environmental engineer',
     'environment', 'ecolog', 'conservation',
     'agricultur', 'forestry', 'wildlife',
     'sustainab', 'renewable',
@@ -77,6 +83,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
   ],
 
   'Problem Solving': [
+    'management analyst', 'compliance officer', 'quality control analyst',
     'analyst', 'engineer', 'scientist',
     'technician', 'research', 'investigator',
     'diagnostic', 'quality assurance',
@@ -90,6 +97,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
   ],
 
   Leadership: [
+    'training and development specialist', 'project management specialist',
     'manager', 'director', 'executive',
     'supervisor', 'administrator',
     'coordinator', 'project manager',
@@ -103,6 +111,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
   ],
 
   'Working with Data': [
+    'operations research analyst', 'survey researcher', 'business intelligence analyst',
     'data', 'statistic', 'analyst',
     'research', 'actuar', 'financial',
     'business intelligence',
@@ -116,6 +125,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
   ],
 
   Communication: [
+    'public relations specialist', 'human resources specialist', 'fundraiser',
     'public relations', 'writer', 'reporter',
     'marketing', 'teacher', 'communications',
     'journalist', 'editor', 'interpreter',
@@ -129,6 +139,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
   ],
 
   'Working with Children': [
+    'childcare worker', 'school psychologist', 'speech language pathologist',
     'child', 'school', 'teacher',
     'education', 'pediatric', 'youth',
     'early childhood', 'preschool',
@@ -143,6 +154,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
   ],
 
   Healthcare: [
+    'health information', 'medical records', 'health education specialist',
     'medical', 'nurs', 'health',
     'patient', 'physician', 'therap',
     'clinical', 'pharmac', 'dental',
@@ -157,6 +169,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
   ],
 
   Entrepreneurship: [
+    'market research analyst', 'fundraiser', 'buyer', 'project management specialist',
     'business', 'marketing', 'sales',
     'product', 'executive',
     'business development',
@@ -281,184 +294,94 @@ function getBackgroundTerms(profile: UserProfile): string[] {
   return [...terms];
 }
 
-/**
- * Build a balanced discovery shortlist before the detailed O*NET matching step.
- * These scores choose which occupations to inspect; they are NOT match percentages.
- */
-export function selectOnetCandidates(
-  catalog: CatalogCareer[],
-  profile: UserProfile
-): CatalogCareer[] {
-  if (catalog.length === 0) return [];
-
-  const interests = [...new Set(profile.interests ?? [])].filter(
-    (label) => (TOPIC_TERMS[label]?.length ?? 0) > 0
-  );
-  const goals = [...new Set(profile.goals ?? [])];
-  const goalTerms = [...new Set(goals.flatMap((label) => TOPIC_TERMS[label] ?? []))];
-  const backgroundTerms = getBackgroundTerms(profile);
-
-  const scored = catalog.map((career) => {
-    const title = career.title.toLowerCase();
-    const interestHits = interests.map((label) =>
-      (TOPIC_TERMS[label] ?? []).filter((term) => title.includes(term)).length
-    );
-    const goalHits = goalTerms.filter((term) => title.includes(term)).length;
-    const backgroundHits = backgroundTerms.filter((term) => title.includes(term)).length;
-    const matchingInterests = interestHits.filter((hits) => hits > 0).length;
-
-    // Reward alignment with more than one selected interest, not just many
-    // overlapping words from one broad category such as Leadership.
-    const score =
-      matchingInterests * 4 +
-      interestHits.reduce((sum, hits) => sum + Math.min(hits, 2), 0) +
-      Math.min(goalHits, 2) * 1.5 +
-      Math.min(backgroundHits, 3) * 0.4;
-
-    return { career, score, interestHits, matchingInterests, goalHits };
-  });
-
-  const byScore = (a: (typeof scored)[number], b: (typeof scored)[number]) =>
-    b.score - a.score || a.career.title.localeCompare(b.career.title);
-
-  const selected: CatalogCareer[] = [];
-  const selectedIds = new Set<string>();
-  const familyCounts = new Map<string, number>();
-
-  // Prevent one title family (e.g. many kinds of supervisors) from
-  // filling the shortlist. This is a soft limit, relaxed if needed.
-  
-const familyOf = (title: string) =>
-  title
-    .toLowerCase()
-    .replace(/[^a-z ]/g, ' ')
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .join(' ');
-
-// The first two digits of an O*NET occupation code
-// identify its broad SOC occupational group.
-const occupationGroupOf = (id: string) =>
-  id.split('-')[0];
-
-const groupCounts = new Map<string, number>();
-
-// Allow variety across broad occupational groups.
-// This is a discovery limit, not a match-score penalty.
-const MAX_PER_GROUP = 8;
-
-  
-const add = (
-  item: (typeof scored)[number],
-  enforceDiversity = true
-) => {
-  const id = item.career.id;
-  const family = familyOf(item.career.title);
-  const group = occupationGroupOf(id);
-
-  if (
-    selectedIds.has(id) ||
-    selected.length >= DETAIL_LIMIT
-  ) {
-    return false;
-  }
-
-  if (enforceDiversity) {
-    if ((familyCounts.get(family) ?? 0) >= 2) {
-      return false;
-    }
-
-    if ((groupCounts.get(group) ?? 0) >= MAX_PER_GROUP) {
-      return false;
-    }
-  }
-
-  selected.push(item.career);
-  selectedIds.add(id);
-
-  familyCounts.set(
-    family,
-    (familyCounts.get(family) ?? 0) + 1
-  );
-
-  groupCounts.set(
-    group,
-    (groupCounts.get(group) ?? 0) + 1
-  );
-
-  return true;
+// Title-based discovery proxies only. Detailed matching still uses O*NET evidence.
+const SKILL_TERMS: Record<string, string[]> = {
+  Communication: ['public relations', 'writer', 'communications', 'counsel', 'recruit', 'sales', 'training specialist', 'fundrais'],
+  Leadership: ['project management', 'training specialist', 'manager', 'supervisor', 'director', 'coordinator'],
+  Organization: ['logistics', 'planner', 'project management', 'administrative', 'procurement', 'event planner', 'scheduler'],
+  'Problem Solving': ['analyst', 'engineer', 'research', 'consultant', 'investigator', 'technician'],
+  Research: ['research', 'scientist', 'economist', 'epidemiolog', 'survey', 'market research'],
+  Creativity: ['design', 'writer', 'artist', 'advertis', 'editor', 'producer', 'architect'],
+  Teamwork: ['coordinator', 'community', 'human resources', 'project management', 'social work', 'healthcare'],
+  'Analytical Thinking': ['analyst', 'statistic', 'account', 'economist', 'data', 'research', 'auditor'],
 };
+const GOAL_TERMS: Record<string, string[]> = {
+  leadership: TOPIC_TERMS.Leadership,
+  helpingothers: TOPIC_TERMS['Helping People'],
+  creativity: TOPIC_TERMS.Creativity,
+  creativeexpression: TOPIC_TERMS.Creativity,
+  makinganimpact: ['community', 'public health', 'conservation', 'social service', 'fundrais', 'policy'],
+  impact: ['community', 'public health', 'conservation', 'social service', 'fundrais', 'policy'],
+};
+const GENERIC = new Set(['manager', 'management', 'director', 'supervisor', 'administrator', 'executive', 'operations', 'teacher', 'analyst', 'research', 'coordinator', 'care', 'systems', 'product', 'project']);
+function titleStrength(title: string, terms: string[]): number {
+  return terms.reduce((best, term) => {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const hit = new RegExp(`\\b${escaped}\\w*`, 'i').test(title);
+    return Math.max(best, hit ? (GENERIC.has(term) ? 0.35 : 1) : 0);
+  }, 0);
+}
 
-
-  // Reserve a small portion for exploration beyond the selected topics.
-  const explorationSlots = Math.min(6, Math.floor(DETAIL_LIMIT / 6));
-  const mainLimit = Math.min(catalog.length, DETAIL_LIMIT - explorationSlots);
-
-  // Round-robin across the user's selected interests instead of allowing
-  // the broadest keyword list to dominate the entire candidate shortlist.
-  const pools = interests.map((_, index) =>
-    scored.filter((item) => item.interestHits[index] > 0).sort(byScore)
-  );
-  const offsets = pools.map(() => 0);
-  let progressed = true;
-  while (selected.length < mainLimit && progressed) {
-    progressed = false;
-    for (let i = 0; i < pools.length && selected.length < mainLimit; i++) {
-      while (offsets[i] < pools[i].length) {
-        const item = pools[i][offsets[i]++];
-        if (add(item)) {
-          progressed = true;
-          break;
+/** Discovery scores are not compatibility percentages. */
+export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProfile): CatalogCareer[] {
+  const interests = [...new Set(profile.interests ?? [])].filter(label => TOPIC_TERMS[label]);
+  const skills = Object.entries(profile.skills ?? {}).filter(([name, rating]) => SKILL_TERMS[name] && typeof rating === 'number' && rating >= 4);
+  const goals = [...new Set((profile.goals ?? []).map(goal => goal.toLowerCase().replace(/[^a-z]/g, '')))].filter(goal => GOAL_TERMS[goal]);
+  const backgroundTerms = getBackgroundTerms(profile);
+  const mean = (values: number[]) => values.length ? values.reduce((a,b) => a+b,0)/values.length : 0;
+  const scored = catalog.map(career => {
+    const title = career.title.toLowerCase();
+    const interestHits = interests.map(label => titleStrength(title, TOPIC_TERMS[label]));
+    const skillHits = skills.map(([name, rating]) => titleStrength(title, SKILL_TERMS[name]) * Number(rating)/5);
+    const goalHits = goals.map(goal => titleStrength(title, GOAL_TERMS[goal]));
+    const background = titleStrength(title, backgroundTerms);
+    const strength = (hits: number[]) => 0.6 * Math.max(0,...hits) + 0.4 * mean(hits);
+    const score = 4 * strength(interestHits) + 3 * strength(skillHits) + 2 * strength(goalHits) + 1.5 * background;
+    return { career, score, interestHits, skillHits, goalHits, background };
+  });
+  type Item = (typeof scored)[number];
+  const byScore = (a: Item,b: Item) => b.score-a.score || a.career.title.localeCompare(b.career.title);
+  const ranked = [...scored].sort(byScore);
+  const selected: CatalogCareer[] = [];
+  const ids = new Set<string>();
+  const groups = new Map<string,number>();
+  const families = new Map<string,number>();
+  const add = (item: Item, limit: number, diverse = true) => {
+    const {career} = item;
+    const group = career.id.split('-')[0];
+    const family = career.title.toLowerCase().replace(/[^a-z ]/g,' ').trim().split(/\s+/).slice(0,2).join(' ');
+    if (ids.has(career.id) || selected.length >= limit) return false;
+    if (diverse && ((groups.get(group) ?? 0) >= 8 || (families.get(family) ?? 0) >= 2)) return false;
+    selected.push(career); ids.add(career.id);
+    groups.set(group,(groups.get(group) ?? 0)+1);
+    families.set(family,(families.get(family) ?? 0)+1);
+    return true;
+  };
+  const roundRobin = (pools: Item[][], limit: number) => {
+    const offsets = pools.map(() => 0);
+    let progress = true;
+    while (progress && selected.length < limit) {
+      progress = false;
+      pools.forEach((pool,i) => {
+        while (selected.length < limit && offsets[i] < pool.length) {
+          if (add(pool[offsets[i]++],limit)) { progress = true; break; }
         }
-      }
+      });
     }
-  }
-
-  // Fill remaining main slots with strong cross-interest or goal matches.
-  const coreMatches = scored
-    .filter((item) => item.matchingInterests > 0 || item.goalHits > 0)
-    .sort(byScore);
-  for (const item of coreMatches) {
-    if (selected.length >= mainLimit) break;
-    add(item);
-  }
-
-  // Exploratory occupations: distribute across other topic areas rather
-  // than taking the first alphabetically named occupations in O*NET.
-  const otherTopics = Object.keys(TOPIC_TERMS).filter(
-    (label) => !interests.includes(label)
-  );
-  const exploratoryPools = otherTopics.map((label) =>
-    scored
-      .filter((item) =>
-        (TOPIC_TERMS[label] ?? []).some((term) =>
-          item.career.title.toLowerCase().includes(term)
-        )
-      )
-      .sort(byScore)
-  );
-  const explorationStart = selected.length;
-  let round = 0;
-  while (selected.length < Math.min(DETAIL_LIMIT, explorationStart + explorationSlots)) {
-    let addedInRound = false;
-    for (const pool of exploratoryPools) {
-      if (selected.length >= Math.min(DETAIL_LIMIT, explorationStart + explorationSlots)) break;
-      if (pool[round] && add(pool[round])) addedInRound = true;
-    }
-    round++;
-    if (!addedInRound && round > Math.max(0, ...exploratoryPools.map((p) => p.length))) break;
-  }
-
-  // Always fill the available detail budget, even for sparse profiles.
-  for (const item of [...scored].sort(byScore)) {
-    if (selected.length >= Math.min(DETAIL_LIMIT, catalog.length)) break;
-    add(item);
-  }
-  for (const item of [...scored].sort(byScore)) {
-    if (selected.length >= Math.min(DETAIL_LIMIT, catalog.length)) break;
-    add(item, false);
-  }
-
+  };
+  const limit = Math.min(DETAIL_LIMIT,catalog.length);
+  const mainLimit = Math.max(0,limit-Math.floor(limit/6));
+  const pools = [
+    ...interests.map((_,i) => ranked.filter(item => item.interestHits[i]>0)),
+    ...skills.map((_,i) => ranked.filter(item => item.skillHits[i]>0)),
+    ...goals.map((_,i) => ranked.filter(item => item.goalHits[i]>0)),
+    ...(backgroundTerms.length ? [ranked.filter(item => item.background>0)] : []),
+  ];
+  roundRobin(pools,mainLimit);
+  for (const item of ranked) if (item.score>0) add(item,mainLimit);
+  const exploration = Object.keys(TOPIC_TERMS).filter(label => !interests.includes(label)).map(label => ranked.filter(item => titleStrength(item.career.title,TOPIC_TERMS[label])>0));
+  roundRobin(exploration,limit);
+  for (const item of ranked) add(item,limit);
+  for (const item of ranked) add(item,limit,false);
   return selected;
 }
