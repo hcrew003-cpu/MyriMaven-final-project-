@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useCareer } from '../context/CareerContext';
 import type { OnetCareer } from '../context/CareerContext';
 import { calculateOnetMatch } from '../lib/onetMatching';
-import { selectOnetCandidates } from '../lib/onetRecommendations';
+import {
+  selectOnetCandidates,
+  getCareerBackgroundRelevance,
+} from '../lib/onetRecommendations';
 import type { CatalogCareer } from '../lib/onetRecommendations';
 
 export type RankedOnetCareer = {
@@ -160,15 +163,34 @@ const candidates = useMemo(
     return () => { cancelled = true; };
   }, [candidateKey]);
 
-  const rankedCareers = useMemo<RankedOnetCareer[]>(
-    () => careers
-      .map((career) => ({
+  
+const rankedCareers = useMemo(() => {
+  return careers
+    .map((career) => {
+      const match = calculateOnetMatch(career, userProfile);
+
+      const background = getCareerBackgroundRelevance(
         career,
-        match: calculateOnetMatch(career, userProfile),
-      }))
-      .sort((a, b) => b.match.score - a.match.score),
-    [careers, userProfile]
-  );
+        userProfile
+      );
+
+      const rankingScore =
+        match.score + background.strength * 8;
+
+      return {
+        career,
+        match,
+        background,
+        rankingScore,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.rankingScore - a.rankingScore ||
+        b.match.score - a.match.score
+    );
+}, [careers, userProfile]);
+
 
   return {
     catalog,
