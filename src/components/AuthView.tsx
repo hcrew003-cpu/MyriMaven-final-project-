@@ -7,7 +7,7 @@ import { useCareer } from '../context/CareerContext';
 
 export default function AuthView() {
   const { setActiveView } = useCareer();
-  const [mode, setMode] = useState<'signup' | 'login'>('login');
+  const [mode, setMode] = useState<'signup' | 'login' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -48,7 +48,13 @@ export default function AuthView() {
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
-      if (mode === 'signup') {
+      if (mode === 'forgot') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (error) throw error;
+        setMessage('If an account exists for this email, a password reset link will be sent. Check your inbox and spam folder.');
+      } else if (mode === 'signup') {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
@@ -122,13 +128,14 @@ export default function AuthView() {
             Career Sandbox
           </div>
           <h1 style={{ margin: '0 0 10px', fontSize: 'clamp(26px, 4vw, 32px)', lineHeight: 1.2, fontWeight: 800, color: 'var(--dark-slate, #17263b)' }}>
-            {mode === 'login' ? 'Welcome back' : 'Create your account'}
+            {mode === 'forgot' ? 'Reset your password' : mode === 'login' ? 'Welcome back' : 'Create your account'}
           </h1>
           <p style={{ margin: 0, color: 'var(--text-muted, #66758a)', lineHeight: 1.6, fontSize: 15 }}>
-            {mode === 'login' ? 'Log in to continue exploring your career possibilities.' : 'Save your discoveries and explore careers that fit you.'}
+            {mode === 'forgot' ? 'Enter your email to receive a password reset link.' : mode === 'login' ? 'Log in to continue exploring your career possibilities.' : 'Save your discoveries and explore careers that fit you.'}
           </p>
         </div>
 
+        {mode !== 'forgot' && <>
         <button type="button" disabled={loading} onClick={handleGoogleSignIn}
           style={{ ...buttonStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#fff', border: '1px solid #cbd5e1', color: '#243247' }}>
           <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
@@ -146,13 +153,14 @@ export default function AuthView() {
           <span style={{ height: 1, flex: 1, background: '#e2e8f0' }} />
         </div>
 
+        </>}
         <form onSubmit={handleSubmit}>
           <label htmlFor="auth-email" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--dark-slate, #17263b)', marginBottom: 18 }}>
             Email address
             <input id="auth-email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" style={inputStyle} />
           </label>
 
-          <label htmlFor="auth-password" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--dark-slate, #17263b)', marginBottom: mode === 'signup' ? 12 : 24 }}>
+          {mode !== 'forgot' && <label htmlFor="auth-password" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--dark-slate, #17263b)', marginBottom: mode === 'signup' ? 12 : 24 }}>
             Password
             <div style={{ position: 'relative' }}>
               <input id="auth-password" type={showPassword ? 'text' : 'password'}
@@ -167,7 +175,9 @@ export default function AuthView() {
                 {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
               </button>
             </div>
-          </label>
+          </label>}
+
+          {mode === 'login' && <button type="button" disabled={loading} onClick={() => { setMode('forgot'); setPassword(''); setMessage(''); }} style={{ display: 'block', margin: '-12px 0 20px auto', border: 0, background: 'transparent', color: 'var(--primary, #0c6957)', cursor: 'pointer', fontWeight: 700 }}>Forgot password?</button>}
 
           {mode === 'signup' && (
             <>
@@ -209,7 +219,7 @@ export default function AuthView() {
           <button type="submit" disabled={loading || (mode === 'signup' && !signupValid)}
             className="btn-primary"
             style={{ ...buttonStyle, border: 'none', cursor: loading || (mode === 'signup' && !signupValid) ? 'not-allowed' : 'pointer', opacity: loading || (mode === 'signup' && !signupValid) ? 0.6 : 1 }}>
-            {loading ? 'Please wait...' : mode === 'signup' ? 'Create account' : 'Log in with email'}
+            {loading ? 'Please wait...' : mode === 'forgot' ? 'Send reset link' : mode === 'signup' ? 'Create account' : 'Log in with email'}
           </button>
         </form>
 
@@ -220,10 +230,10 @@ export default function AuthView() {
         )}
 
         <p style={{ textAlign: 'center', margin: '26px 0 0', fontSize: 14, color: 'var(--text-muted, #66758a)' }}>
-          {mode === 'signup' ? 'Already have an account?' : 'New to Career Sandbox?'}{' '}
+          {mode === 'forgot' ? 'Remember your password?' : mode === 'signup' ? 'Already have an account?' : 'New to Career Sandbox?'}{' '}
           <button type="button" disabled={loading}
             onClick={() => {
-              setMode(mode === 'signup' ? 'login' : 'signup');
+              setMode(mode === 'login' ? 'signup' : 'login');
               setMessage('');
               setPassword('');
               setConfirmPassword('');
@@ -231,7 +241,7 @@ export default function AuthView() {
               setShowConfirmPassword(false);
             }}
             style={{ border: 0, background: 'transparent', color: 'var(--primary, #4f46e5)', fontWeight: 800, cursor: 'pointer', padding: '4px 2px', fontSize: 14 }}>
-            {mode === 'signup' ? 'Log in' : 'Sign up'}
+            {mode === 'login' ? 'Sign up' : 'Back to login'}
           </button>
         </p>
       </div>
