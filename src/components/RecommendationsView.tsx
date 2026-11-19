@@ -33,6 +33,36 @@ const EXPLORATION_DESCRIPTIONS: Record<ExplorationFilter, string> = {
 };
 const PAGE_SIZE = 30;
 
+const OCCUPATIONAL_FIELDS: Record<string, string> = {
+  "11": "Management",
+  "13": "Business & Finance",
+  "15": "Computer & Mathematics",
+  "17": "Architecture & Engineering",
+  "19": "Life, Physical & Social Sciences",
+  "21": "Community & Social Services",
+  "23": "Legal",
+  "25": "Education & Library",
+  "27": "Arts, Design, Entertainment, Sports & Media",
+  "29": "Healthcare Practitioners & Technical",
+  "31": "Healthcare Support",
+  "33": "Protective Services",
+  "35": "Food Preparation & Serving",
+  "37": "Building & Grounds Maintenance",
+  "39": "Personal Care & Service",
+  "41": "Sales",
+  "43": "Office & Administrative Support",
+  "45": "Farming, Fishing & Forestry",
+  "47": "Construction & Extraction",
+  "49": "Installation, Maintenance & Repair",
+  "51": "Production",
+  "53": "Transportation & Material Moving",
+  "55": "Military Specific"
+};
+
+function occupationalField(id: string): string {
+  return OCCUPATIONAL_FIELDS[id.split("-")[0]] ?? "Other / unclassified occupation";
+}
+
 function categoryMatch(
   title: string,
   filter: Filter
@@ -94,70 +124,61 @@ export default function RecommendationsView() {
   const backgroundLabels = [userProfile.major, userProfile.minor]
     .filter((value): value is string => Boolean(value?.trim()));
 
-  // Group by occupational alignment and transferable evidence, not score bands.
+  // Occupational relationships guide categories; compatibility scores are unchanged.
   const exploration = useMemo(() => {
-    const rows = rankedCareers.map((entry) => {
+    const rows = rankedCareers.map(entry => {
       const { interests, skills, goals } = entry.match.breakdown;
       const alignment = entry.match.occupationalAlignment ?? interests ?? 0;
-      const coreCount = entry.match.coreInterestMatches?.length ?? 0;
+      const skill = skills ?? 0;
+      const goal = goals ?? 0;
       const dutyScores = Object.values(entry.match.dutyInterestScores ?? {});
       const dutyPeak = Math.max(0, ...dutyScores);
       const dutyCount = dutyScores.filter(score => score >= 35).length;
-      const skill = skills ?? 0;
-      const goal = goals ?? 0;
-      const background = userProfile.useCareerBackground === true
-        ? (entry.background?.strength ?? 0) : 0;
-      // Skills and goals support discovery, but do not replace occupational relevance.
-      const personal = Math.max(alignment, skill * 0.8, goal * 0.65);
-      const support = alignment * 0.45 + skill * 0.35 + goal * 0.20;
-      const bestRank = entry.match.score * 0.55 + alignment * 0.45 + background * 6;
+      const coreCount = entry.match.coreInterestMatches?.length ?? 0;
+      const background = userProfile.useCareerBackground === true ? entry.background?.strength ?? 0 : 0;
       const group = entry.career.id.split('-')[0];
-      const family = entry.career.id.split('.')[0].slice(0, 5);
-      return { entry, alignment, skill, goal, background,
-        personal, support, bestRank, group, family, coreCount, dutyPeak, dutyCount };
+      const family = entry.career.id.slice(0, 5);
+      const relatedCodes = new Set((entry.career.relatedOccupations?.occupation ?? []).map(item => item.code));
+      const evidence = alignment >= 25 || dutyPeak >= 35 || goal >= 45;
+      const transfer = skill >= 45 && (dutyPeak >= 30 || goal >= 35 || alignment >= 25);
+      const support = alignment * .40 + dutyPeak * .25 + skill * .20 + goal * .15;
+      const bestRank = entry.match.score * .60 + alignment * .25 + dutyPeak * .15 + background * 2;
+      return { entry, group, family, relatedCodes, alignment, skill, goal, dutyPeak, dutyCount, coreCount, background, evidence, transfer, support, bestRank };
     });
     type Row = (typeof rows)[number];
-    const diverse = (pool: Row[], limit: number, familyLimit: number) => {
+    const diverse = (pool: Row[], limit: number, familyLimit: number, groupLimit: number) => {
+      const families = new Map<string, number>();
+      const groups = new Map<string, number>();
       const result: Row[] = [];
-      const counts = new Map<string, number>();
       for (const row of pool) {
-        if ((counts.get(row.family) ?? 0) >= familyLimit) continue;
+        if ((families.get(row.family) ?? 0) >= familyLimit || (groups.get(row.group) ?? 0) >= groupLimit) continue;
         result.push(row);
-        counts.set(row.family, (counts.get(row.family) ?? 0) + 1);
-        if (result.length === limit) break;
+        families.set(row.family, (families.get(row.family) ?? 0) + 1);
+        groups.set(row.group, (groups.get(row.group) ?? 0) + 1);
+        if (result.length >= limit) break;
       }
       return result;
     };
-    const bestPool = [...rows].sort((a, b) => b.bestRank - a.bestRank || b.entry.match.score - a.entry.match.score);
-    const best = diverse(bestPool.filter(row => row.personal >= 15 && row.entry.match.reasons.length > 0), 12, 2);
-    const leadingGroups = new Set(best.slice(0, 6).map(row => row.group));
+    const eligible = rows.filter(row => row.entry.match.reasons.length > 0 && (row.evidence || row.transfer));
+    const best = diverse(eligible.filter(row => row.evidence && row.entry.match.score >= 40)
+      .sort((a,b) => b.bestRank-a.bestRank || b.entry.match.score-a.entry.match.score), 12, 2, 5);
+    // Use the strongest available careers as anchors, rather than the background alone.
+    const anchors = best.slice(0, 6);
     const bestIds = new Set(best.map(row => row.entry.career.id));
-    const remaining = rows.filter(row => !bestIds.has(row.entry.career.id));
-    const peak = Math.max(0, ...rows.map(row => row.personal));
-    const threshold = Math.max(20, peak * 0.4);
-    const eligible = remaining.filter(row => row.personal >= threshold && row.entry.match.reasons.length > 0);
-    const leadingFamilies = new Set(best.slice(0, 6).map(row => row.family));
-    const relatedRank = (row: Row) => row.support + row.entry.match.score * 0.35 + row.background * 8;
-    // Reserve cross-field occupations for discovery, even if they share a core interest.
-    const isAdjacent = (row: Row) => leadingFamilies.has(row.family) ||
-      (leadingGroups.has(row.group) && (row.coreCount > 0 || row.dutyPeak >= 35)) ||
-      (row.background >= 0.35 && row.dutyPeak >= 25);
-    const related = diverse(eligible.filter(row => isAdjacent(row) &&
-      (row.coreCount > 0 || row.dutyPeak >= 35 || row.background >= 0.35))
-      .sort((a, b) => relatedRank(b) - relatedRank(a)), 12, 2);
+    const remaining = eligible.filter(row => !bestIds.has(row.entry.career.id));
+    const linked = (a: Row, b: Row) => a.relatedCodes.has(b.entry.career.id) || b.relatedCodes.has(a.entry.career.id);
+    // Healthcare practice and healthcare support share a broad work domain.
+    // All other groups retain their own identity; explicit O*NET links bridge fields.
+    const domain = (group: string) => group === '29' || group === '31' ? 'healthcare' : group;
+    const adjacent = (row: Row) => anchors.some(anchor => row.family === anchor.family || linked(row, anchor) || domain(row.group) === domain(anchor.group));
+    const bridge = (row: Row) => row.background > 0 && row.coreCount > 0 && row.dutyPeak >= 35;
+    const related = diverse(remaining.filter(row => (adjacent(row) || bridge(row)) && row.evidence)
+      .sort((a,b) => (b.support + b.entry.match.score * .35 + b.background * 4) - (a.support + a.entry.match.score * .35 + a.background * 4)), 12, 2, 5);
     const relatedIds = new Set(related.map(row => row.entry.career.id));
-    const unexpectedRank = (row: Row) => row.dutyPeak * 0.35 + row.support * 0.35 + row.entry.match.score * 0.30;
-    const unexpected = diverse(eligible.filter(row => !relatedIds.has(row.entry.career.id) &&
-      !isAdjacent(row) && !leadingGroups.has(row.group) &&
-      ((row.coreCount > 0 && row.dutyPeak >= 45) ||
-       (row.dutyPeak >= 35 && row.skill >= 45 && (row.dutyCount >= 2 || row.goal >= 35))))
-      .sort((a, b) => unexpectedRank(b) - unexpectedRank(a)), 8, 1);
-    return {
-      all: rankedCareers,
-      best: best.map(row => row.entry),
-      related: related.map(row => row.entry),
-      unexpected: unexpected.map(row => row.entry),
-    };
+    const unexpected = diverse(remaining.filter(row => !relatedIds.has(row.entry.career.id) && !adjacent(row) && !bridge(row) &&
+      ((row.coreCount > 0 && row.dutyPeak >= 40) || (row.transfer && (row.dutyCount >= 2 || row.goal >= 40))))
+      .sort((a,b) => (b.support + b.entry.match.score * .30) - (a.support + a.entry.match.score * .30)), 8, 1, 2);
+    return { all: rankedCareers, best: best.map(row => row.entry), related: related.map(row => row.entry), unexpected: unexpected.map(row => row.entry) };
   }, [rankedCareers, userProfile.useCareerBackground]);
 
   const recommended = exploration[explorationFilter];
@@ -491,7 +512,7 @@ export default function RecommendationsView() {
                         <div>
                           <div className="career-card-header">
                             <span className="career-category">
-                              O*NET Occupation
+                              {occupationalField(career.id)}
                             </span>
 
                             <span
@@ -707,7 +728,7 @@ export default function RecommendationsView() {
                           color: 'var(--text-muted)',
                         }}
                       >
-                        O*NET {career.id}
+                        {occupationalField(career.id)} · O*NET {career.id}
                       </span>
 
                       <h2
