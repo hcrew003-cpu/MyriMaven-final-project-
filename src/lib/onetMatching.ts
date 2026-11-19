@@ -31,78 +31,265 @@ const CATEGORY_WEIGHTS: Record<MatchCategory, number> = {
 };
 
 const INTEREST_TERMS: Record<string, string[]> = {
-  Technology: [
-    'software', 'computer', 'programming',
-    'information technology', 'digital systems',
+  "Technology": [
+    "software development",
+    "develop software",
+    "programming",
+    "computer systems",
+    "information technology",
+    "digital systems",
+    "cybersecurity",
+    "network administration",
+    "database design",
+    "debug software",
+    "systems integration",
+    "technical support",
+    "install software",
+    "computer network",
+    "software engineer"
   ],
-  Business: [
-    'business administration', 'business strategy', 'marketing',
-    'sales', 'finance', 'accounting', 'human resources',
-    'market research', 'procurement', 'supply chain',
-    'management analysis', 'budgeting', 'business development',
-    'project management', 'business operations',
-    'organizational strategy', 'market demand',
-    'consumer research', 'marketing policies',
+  "Business": [
+    "business administration",
+    "business strategy",
+    "marketing",
+    "sales strategy",
+    "sell products",
+    "sales representatives",
+    "finance",
+    "accounting",
+    "human resources",
+    "market research",
+    "procurement",
+    "supply chain",
+    "management analysis",
+    "budgeting",
+    "business development",
+    "project management",
+    "business operations",
+    "organizational strategy",
+    "market demand",
+    "consumer research",
+    "marketing policies",
+    "financial planning",
+    "inventory management"
   ],
-  'Helping People': [
-    'counsel', 'patient', 'community outreach',
-    'social service', 'assist clients', 'rehabilitation',
-    'support individuals', 'mental health', 'advocacy',
-    'social work', 'therapy', 'psycholog', 'client support',
-    'behavioral health',
+  "Helping People": [
+    "counsel",
+    "psychotherapy",
+    "mental health treatment",
+    "treat mental",
+    "patient care",
+    "care for patients",
+    "treat patients",
+    "assist patients",
+    "provide care",
+    "community outreach",
+    "social service",
+    "rehabilitation",
+    "support individuals",
+    "advocacy",
+    "social work",
+    "emotional support",
+    "behavioral health",
+    "assess client needs",
+    "help people",
+    "crisis intervention",
+    "teach students",
+    "disability support",
+    "protect people",
+    "rescue people",
+    "assist clients",
+    "develop treatment plans",
+    "therapist"
   ],
-  Creativity: [
-    'design', 'artistic', 'creative',
-    'advertising', 'visual', 'originality',
-    'promotional campaigns', 'creative concepts',
-    'brand strategy', 'content creation',
+  "Creativity": [
+    "artistic",
+    "creative",
+    "advertising",
+    "visual design",
+    "graphic design",
+    "originality",
+    "promotional campaigns",
+    "creative concepts",
+    "brand strategy",
+    "content creation",
+    "create artwork",
+    "illustration",
+    "design layouts",
+    "fashion design",
+    "interior design",
+    "compose music",
+    "perform music",
+    "choreograph",
+    "write stories",
+    "photography",
+    "sculpt",
+    "design products",
+    "develop concepts"
   ],
-  Environment: [
-    'environmental', 'ecology', 'conservation',
-    'sustainability', 'natural resources', 'ecosystem',
-    'habitat', 'pollution', 'environment',
-    'soil conservation', 'restoration', 'wildlife',
-    'natural environment',
+  "Environment": [
+    "environmental protection",
+    "environmental science",
+    "environmental engineer",
+    "environmental restoration",
+    "environmental impact",
+    "ecology",
+    "conservation",
+    "sustainability",
+    "natural resources",
+    "ecosystem",
+    "wildlife habitat",
+    "pollution",
+    "soil conservation",
+    "restore ecosystems",
+    "wildlife",
+    "natural environment",
+    "water quality",
+    "renewable energy",
+    "waste reduction",
+    "forest management",
+    "climate change"
   ],
-  'Problem Solving': [
-    'problem solving', 'troubleshooting',
-    'critical thinking', 'diagnos', 'problem resolution',
-    'evaluate alternatives', 'assessment',
-    'identify problems', 'decision making',
+  "Problem Solving": [
+    "problem solving",
+    "troubleshooting",
+    "critical thinking",
+    "diagnos",
+    "problem resolution",
+    "evaluate alternatives",
+    "identify problems",
+    "decision making",
+    "investigate causes",
+    "resolve problems",
+    "repair equipment",
+    "analyze failures",
+    "develop solutions"
   ],
-  Leadership: [
-    'manage', 'supervis', 'leadership',
-    'direct operations', 'coordinate teams',
-    'project management', 'lead teams', 'staff development',
+  "Leadership": [
+    "manage staff",
+    "manage personnel",
+    "manage employees",
+    "supervise staff",
+    "supervise workers",
+    "supervise employees",
+    "leadership",
+    "direct operations",
+    "coordinate teams",
+    "project management",
+    "lead teams",
+    "staff development",
+    "direct personnel",
+    "train staff",
+    "management of personnel",
+    "supervisor",
+    "allocate resources"
   ],
-  'Working with Data': [
-    'data analysis', 'statistics', 'analytics',
-    'data collection', 'quantitative', 'statistical analysis',
-    'analyze data', 'interpret data', 'modeling', 'survey data',
+  "Working with Data": [
+    "data analysis",
+    "statistics",
+    "analytics",
+    "quantitative analysis",
+    "statistical analysis",
+    "analyze data",
+    "interpret data",
+    "statistical modeling",
+    "survey data",
+    "analyze trends",
+    "data visualization",
+    "analyze results",
+    "data scientist",
+    "statistician",
+    "forecast demand",
+    "evaluate data",
+    "collect research data"
   ],
-  Communication: [
-    'public speaking', 'writing', 'presentation',
-    'interpersonal communication', 'negotiation',
-    'interview', 'active listening', 'public relations',
-    'oral expression', 'explain information', 'advise clients',
-    'train employees', 'present findings',
-    'marketing communications', 'promotional campaigns',
-    'media relations',
+  "Communication": [
+    "public speaking",
+    "writing",
+    "presentation",
+    "interpersonal communication",
+    "negotiation",
+    "interview",
+    "active listening",
+    "public relations",
+    "oral expression",
+    "explain information",
+    "advise clients",
+    "train employees",
+    "present findings",
+    "marketing communications",
+    "promotional campaigns",
+    "media relations",
+    "teach students",
+    "interpret languages",
+    "communicate findings",
+    "write articles"
   ],
-  'Working with Children': [
-    'children', 'child development',
-    'early childhood', 'elementary school',
+  "Working with Children": [
+    "teach children",
+    "teach students",
+    "child development",
+    "early childhood",
+    "elementary school",
+    "care for children",
+    "child care",
+    "childcare",
+    "preschool",
+    "pediatric care",
+    "counsel children",
+    "supervise children",
+    "support children",
+    "youth development",
+    "child welfare",
+    "kindergarten"
   ],
-  Healthcare: [
-    'patient', 'clinical', 'medical',
-    'nursing', 'healthcare',
+  "Healthcare": [
+    "patient care",
+    "care for patients",
+    "treat patients",
+    "examine patients",
+    "diagnose disease",
+    "diagnose illness",
+    "clinical assessment",
+    "clinical treatment",
+    "medical treatment",
+    "surgery",
+    "nursing",
+    "nurse",
+    "administer medication",
+    "medical imaging",
+    "rehabilitation",
+    "physical therapy",
+    "occupational therapy",
+    "medical laboratory",
+    "clinical laboratory",
+    "prevent disease",
+    "health promotion",
+    "dental care",
+    "monitor patients",
+    "physician",
+    "paramedic",
+    "mental health treatment",
+    "treat mental"
   ],
-  Entrepreneurship: [
-    'business development', 'entrepreneur',
-    'startup', 'business strategy', 'market opportunities',
-    'new products', 'product development', 'business plans',
-    'market research', 'innovation',
-  ],
+  "Entrepreneurship": [
+    "business development",
+    "entrepreneur",
+    "startup",
+    "business strategy",
+    "market opportunities",
+    "new products",
+    "product development",
+    "business plans",
+    "market research",
+    "commercialization",
+    "launch products",
+    "develop business models",
+    "identify market opportunities",
+    "venture capital",
+    "new business",
+    "business ownership"
+  ]
 };
 
 const SKILL_TERMS: Record<string, string[]> = {
@@ -129,8 +316,8 @@ const SKILL_TERMS: Record<string, string[]> = {
     'evaluate evidence', 'scientific inquiry',
   ],
   Creativity: [
-    'design', 'originality', 'creative thinking',
-    'innovation',
+    'artistic design', 'visual design', 'graphic design', 'originality', 'creative thinking',
+    'creative concepts', 'content creation', 'develop concepts', 'design products',
   ],
   Teamwork: [
     'coordination', 'collaboration',
@@ -150,11 +337,7 @@ const GOAL_TERMS: Record<string, string[]> = {
     'coordinate teams', 'staff development', 'management of personnel',
   ],
   'Helping others': [
-    'patient care', 'counsel', 'community outreach', 'social service',
-    'teach', 'rehabilitation', 'advocacy', 'social work', 'provide care',
-    'mental health', 'psychotherapy', 'psychological treatment',
-    'emotional support', 'assist clients', 'support individuals',
-    'treat mental', 'treat patients', 'help people', 'behavioral health',
+    ...INTEREST_TERMS['Helping People'],
   ],
   Creativity: [
     'creative', 'artistic', 'originality', 'design concepts',
@@ -210,7 +393,7 @@ const PREFERENCE_EVIDENCE = {
   },
   creativeVsAnalytical: {
     low: [
-      'design', 'artistic', 'originality',
+      'visual design', 'artistic', 'originality',
       'creative thinking', 'visual arts',
       'develop concepts', 'creative',
     ],
@@ -275,7 +458,8 @@ function getOccupationSections(career: OnetCareer) {
       .join(' ')
   );
 
-  return { title, description, tasks, skills, knowledge };
+  const taskItems = (career.tasks?.task ?? []).map(task => normalize(task.title ?? '')).filter(Boolean);
+  return { title, description, tasks, taskItems, skills, knowledge };
 }
 
 type Sections = ReturnType<typeof getOccupationSections>;
@@ -347,17 +531,14 @@ function interestEvidence(
   const tasks = matchingTerms(sections.tasks, terms);
   const knowledge = matchingTerms(sections.knowledge, terms);
 
-  const coverage = (hits: string[]) =>
-    Math.min(1, hits.length / 2 + (hits.length ? 0.2 : 0));
-
-  const score = clamp(
-    Math.round(
-      20 * coverage(title) +
-      35 * coverage(description) +
-      35 * coverage(tasks) +
-      10 * coverage(knowledge)
-    )
-  );
+  const coverage = (hits: string[]) => hits.length === 0 ? 0 : hits.length === 1 ? 0.7 : 1;
+  const matchingTasks = sections.taskItems.filter(task => matchingTerms(task, terms).length > 0).length;
+  const taskCoverage = sections.taskItems.length
+    ? Math.min(1, matchingTasks / Math.max(2, sections.taskItems.length * 0.30))
+    : 0;
+  const primary = 20 * coverage(title) + 40 * coverage(description) + 30 * taskCoverage;
+  // Knowledge supports direct work evidence, but cannot create it.
+  const score = clamp(Math.round(primary + (primary > 0 ? 10 * coverage(knowledge) : 0)));
 
   return {
     score,
@@ -395,7 +576,7 @@ const DIRECT_SKILLS: Record<string, string[]> = {
     'science', 'active learning', 'reading comprehension',
   ],
   Creativity: [
-    'technology design',
+    // Technical design alone does not establish creative readiness.
   ],
   Teamwork: [
     'coordination', 'social perceptiveness', 'active listening',
@@ -414,7 +595,7 @@ function readableEvidence(terms: string[]): string {
     supervis: 'supervision',
     manage: 'management',
     nurs: 'nursing',
-    patient: 'patient care',
+    patient: 'patient-related work',
     teach: 'teaching',
     interview: 'interviewing',
     design: 'design work',
