@@ -4,6 +4,7 @@
 import React, { useMemo } from 'react';
 import { useCareer } from '../context/CareerContext';
 import { useOnetRecommendations } from '../hooks/useOnetRecommendations';
+import { getMatchPresentation } from '../lib/matchPresentation';
 import {
   GraduationCap,
   BarChart3,
@@ -223,9 +224,8 @@ export default function RecommendationsView() {
               marginTop: 8,
             }}
           >
-            Browse the complete O*NET occupation catalog
-            or explore personalized estimates from a
-            profile-informed shortlist.
+            Discover careers that connect to your interests, strengths,
+            work preferences and goals, or browse the complete O*NET catalog.
           </p>
 
           <p
@@ -235,9 +235,8 @@ export default function RecommendationsView() {
               marginTop: 8,
             }}
           >
-            Match percentages are exploratory estimates,
-            not predictions of career success. Only
-            occupations with loaded details are scored.
+            Your match score is a guide for exploration, not a measure of
+            your qualifications or potential to succeed.
           </p>
 
           <div
@@ -423,21 +422,57 @@ export default function RecommendationsView() {
                   }}
                 >
                   {loadingDetails
-                    ? `Evaluating occupations... ${careers.length} loaded.`
-                    : `${rankedCareers.length} occupations evaluated from a shortlist drawn from ${catalog.length} available careers.`}
+                    ? `Finding career matches for you... ${careers.length} careers loaded.`
+                    : `We’ve evaluated ${rankedCareers.length} of ${catalog.length.toLocaleString('en-CA')} available careers using your profile.`}
                 </p>
 
                 {unscoredGoalNotes.length > 0 && (
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 18 }}>
-                    {unscoredGoalNotes.map(note => <p key={note}>{note}</p>)}
+                    {unscoredGoalNotes.map(note => (
+                      <p key={note}>
+                        {note.split('. Available occupation data')[0].replace('Not scored: ', '')}:
+                        {' '}These goals are not included in your match score because outcomes vary by employer and reliable occupation-level evidence is limited.
+                      </p>
+                    ))}
                   </div>
                 )}
 
                 {userProfile.useCareerBackground === true && (
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 18 }}>
-                    Career background is enabled. Relevant connections may move occupations higher in the list without changing their estimated match percentages.
+                    Career background included. Your background helps uncover additional career possibilities without changing your match scores.
                   </p>
                 )}
+
+                <details className="card" style={{ padding: '16px 20px', marginBottom: 24 }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 700, color: 'var(--primary)' }}>
+                    How are my matches calculated?
+                  </summary>
+                  <p style={{ color: 'var(--text-muted)', marginTop: 12 }}>
+                    Your estimated match compares your profile with available O*NET occupation information.
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginTop: 14 }}>
+                    {[
+                      ['Interests', 30], ['Skills & Strengths', 30],
+                      ['Work Preferences', 30], ['Career Goals', 10],
+                    ].map(([label, weight]) => (
+                      <div key={label} style={{ padding: 12, background: 'var(--primary-subtle)', borderRadius: 10 }}>
+                        <strong>{label}</strong><div>{weight}% standard weight</div>
+                      </div>
+                    ))}
+                  </div>
+                  <p style={{ color: 'var(--text-muted)', marginTop: 14, fontSize: '0.9rem' }}>
+                    Neutral preferences and categories without enough evidence are excluded, and their weights are redistributed across scored categories. Open any full profile to see its individual breakdown. Career background can influence ranking, but not the match percentage.
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+                    {[[85, '85–100%'], [70, '70–84%'], [55, '55–69%'], [40, '40–54%'], [0, '0–39%']].map(([minimum, range]) => {
+                      const presentation = getMatchPresentation(Number(minimum));
+                      return <span key={minimum} className="match-badge" style={{ backgroundColor: presentation.background, color: presentation.color }}>{range} · {presentation.label}</span>;
+                    })}
+                  </div>
+                  <p style={{ color: 'var(--text-muted)', marginTop: 12, fontSize: '0.85rem' }}>
+                    These ranges are exploratory guides, not validated cutoffs or entry requirements.
+                  </p>
+                </details>
 
                 <div
                   style={{
@@ -460,11 +495,13 @@ export default function RecommendationsView() {
                             </span>
 
                             <span
-                              className={`match-badge ${
-                                match.score >= 80
-                                  ? 'match-high'
-                                  : 'match-med'
-                              }`}
+                              className="match-badge"
+                              title={getMatchPresentation(match.score).label}
+                              aria-label={`${match.score}% Estimated Match — ${getMatchPresentation(match.score).label}`}
+                              style={{
+                                backgroundColor: getMatchPresentation(match.score).background,
+                                color: getMatchPresentation(match.score).color,
+                              }}
                             >
                               {match.score}% Estimated Match
                             </span>
