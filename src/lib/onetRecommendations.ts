@@ -55,7 +55,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
 
   Creativity: [
     'copywriter', 'set designer', 'technical writer',
-    'design', 'artist', 'writer',
+    'graphic design', 'fashion design', 'interior design', 'industrial design', 'design', 'artist', 'writer',
     'media', 'advertis', 'creative',
     'architect', 'graphic',
     'animation', 'film', 'video',
@@ -118,7 +118,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
     'database', 'economist',
     'mathematician', 'operations research',
     'market research', 'survey',
-    'data scientist', 'epidemiolog',
+    'data scientist', 'data analyst', 'financial analyst', 'epidemiolog',
     'biostatistic', 'quantitative',
     'forecast', 'information analyst',
     'risk analyst',
@@ -145,7 +145,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
     'early childhood', 'preschool',
     'kindergarten', 'elementary',
     'special education', 'childcare',
-    'school counselor', 'family services',
+    'school counselor', 'elementary school teacher', 'middle school teacher', 'family services',
     'child psychologist',
     'recreation', 'child development',
     'educational assistant',
@@ -156,7 +156,7 @@ const TOPIC_TERMS: Record<string, string[]> = {
   Healthcare: [
     'health information', 'medical records', 'health education specialist',
     'medical', 'nurs', 'health',
-    'patient', 'physician', 'therap',
+    'patient', 'physician', 'medical assistant', 'medical scientist', 'clinical laboratory', 'therap',
     'clinical', 'pharmac', 'dental',
     'surgeon', 'radiolog',
     'diagnostic', 'nutrition',
@@ -268,7 +268,7 @@ const GOAL_TERMS: Record<string, string[]> = {
   makinganimpact: ['community', 'public health', 'conservation', 'social service', 'fundrais', 'policy'],
   impact: ['community', 'public health', 'conservation', 'social service', 'fundrais', 'policy'],
 };
-const GENERIC = new Set(['manager', 'management', 'director', 'supervisor', 'administrator', 'executive', 'operations', 'teacher', 'analyst', 'research', 'coordinator', 'care', 'systems', 'product', 'project', 'scientist', 'technician', 'engineer', 'support specialist', 'health', 'education', 'community', 'technology', 'testing', 'consultant', 'advisor', 'family', 'specialist', 'communications', 'digital', 'media']);
+const GENERIC = new Set(['design', 'developer', 'network', 'web', 'account', 'sales', 'data', 'financial', 'medical', 'patient', 'clinical', 'school', 'recreation', 'environment', 'marine', 'green', 'laboratory', 'diagnostic', 'administrator', 'commercial', 'retail', 'manager', 'management', 'director', 'supervisor', 'administrator', 'executive', 'operations', 'teacher', 'analyst', 'research', 'coordinator', 'care', 'systems', 'product', 'project', 'scientist', 'technician', 'engineer', 'support specialist', 'health', 'education', 'community', 'technology', 'testing', 'consultant', 'advisor', 'family', 'specialist', 'communications', 'digital', 'media']);
 function titleStrength(title: string, terms: string[]): number {
   return terms.reduce((best, term) => {
     const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -307,7 +307,7 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
     const goalHits = goals.map(goal => titleStrength(title, GOAL_TERMS[goal]));
     const background = getCareerBackgroundRelevance(career, profile).strength;
     const strength = (hits: number[]) => 0.6 * Math.max(0,...hits) + 0.4 * mean(hits);
-    const score = 5 * strength(interestHits) + 2 * strength(skillHits) + 2 * strength(goalHits) + 1.5 * background;
+    const score = 7 * strength(interestHits) + 1.5 * strength(skillHits) + 2 * strength(goalHits) + 1 * background;
     return { career, score, interestHits, skillHits, goalHits, background };
   });
   type Item = (typeof scored)[number];
@@ -320,9 +320,10 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
   const add = (item: Item, limit: number, diverse = true) => {
     const {career} = item;
     const group = career.id.split('-')[0];
-    const family = career.id.split('.')[0].slice(0,5);
+    const family = career.id.split('.')[0].slice(0,6);
+    const direct = item.interestHits.some(hit => hit >= 0.5);
     if (ids.has(career.id) || selected.length >= limit) return false;
-    if (diverse && ((groups.get(group) ?? 0) >= Math.ceil(DETAIL_LIMIT * 0.13) || (families.get(family) ?? 0) >= 3)) return false;
+    if (diverse && ((groups.get(group) ?? 0) >= Math.ceil(DETAIL_LIMIT * (direct ? 0.18 : 0.13)) || (families.get(family) ?? 0) >= (direct ? 4 : 3))) return false;
     selected.push(career); ids.add(career.id);
     groups.set(group,(groups.get(group) ?? 0)+1);
     families.set(family,(families.get(family) ?? 0)+1);
@@ -361,6 +362,8 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
   // Load a strong primary foundation first, then reserve room for
   // cross-topic candidates before the main diversity caps are exhausted.
   const foundationLimit = Math.min(mainLimit, Math.ceil(limit * 0.4));
+  const interestPools = interests.map((_, i) => ranked.filter(item => item.interestHits[i] >= 0.5));
+  roundRobin(interestPools, Math.min(foundationLimit, Math.ceil(limit * 0.30)));
   roundRobin(pools, foundationLimit);
   for (const item of ranked) if (item.score > 0) add(item, foundationLimit);
   const exploration = Object.keys(TOPIC_TERMS)
@@ -370,8 +373,11 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
       (item.interestHits.some(hit => hit >= 0.5) ||
        item.goalHits.some(hit => hit >= 0.5) ||
        item.skillHits.filter(hit => hit >= 0.5).length >= 2)
-    ).sort((a,b) => (b.score - 1.5*b.background) - (a.score - 1.5*a.background) || a.career.title.localeCompare(b.career.title)));
+    ).sort((a,b) => (b.score - b.background) - (a.score - a.background) || a.career.title.localeCompare(b.career.title)));
+  // Also explore distinct SOC fields with meaningful profile signals.
+  const fieldPools = [...new Set(ranked.map(item => item.career.id.split('-')[0]))].map(group => ranked.filter(item => item.career.id.startsWith(group + '-') && (item.interestHits.some(hit => hit >= 0.5) || item.goalHits.some(hit => hit >= 0.5) || item.skillHits.filter(hit => hit >= 0.5).length >= 2)));
   const beforeExploration = selected.length;
+  roundRobin(fieldPools, Math.min(limit, beforeExploration + Math.floor(limit / 10)));
   roundRobin(exploration, Math.min(limit, beforeExploration + Math.floor(limit/5)));
   roundRobin(pools, limit);
   for (const item of ranked) if (item.score > 0) add(item, limit);
