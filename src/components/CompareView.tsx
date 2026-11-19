@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useCareer, type OnetCareer } from '../context/CareerContext';
 import { CAREERS } from '../data/careersData';
 import { calculateOnetMatch } from '../lib/onetMatching';
+import { getMatchPresentation } from '../lib/matchPresentation';
 import {
   ArrowLeft,
   X,
@@ -146,20 +147,22 @@ export default function CompareView() {
 
       const match = calculateOnetMatch(onet, userProfile);
 
-return {
-  id,
-  title: onet.title,
-  category: 'O*NET Occupation',
-  description: onet.description,
-  score: match.score,
-  strengths: [],
-  whyFit:
-    'This estimated match is based on your interests, skills, career goals, and work preferences. Open the full career profile to explore the details.',
-  watchOut:
-    'Consider the education requirements, daily responsibilities, and work environment to decide whether this career suits you.',
-  environment: [],
-  education: 'See full O*NET profile',
-};
+      const education = match.considerations.find(item => item.startsWith('Education:'));
+      const considerations = match.considerations.filter(item => !item.startsWith('Education:') && !item.startsWith('Skills to develop:'));
+      const skillsToDevelop = match.skillsToDevelop.length
+        ? `Skills to develop: ${match.skillsToDevelop.join(', ')}.` : '';
+      return {
+        id,
+        title: onet.title,
+        category: 'O*NET Occupation',
+        description: onet.description,
+        score: match.score,
+        strengths: (onet.skills?.element ?? []).map(skill => skill.name).filter(Boolean).slice(0, 6),
+        whyFit: match.reasons.join(' ') || 'Limited matching evidence is available. Explore the full profile.',
+        watchOut: [skillsToDevelop, ...considerations].filter(Boolean).join(' ') || 'Review daily responsibilities and local requirements before deciding.',
+        environment: [],
+        education: education?.replace(/^Education:\s*/, '') ?? 'See full O*NET profile',
+      };
 
     });
 
@@ -216,7 +219,7 @@ return {
               }}
             >
               Comparing {comparingCareers.length} roles
-              against your strengths, work preferences,
+              against your interests, strengths, work preferences,
               and career goals.
             </p>
           </div>
@@ -389,13 +392,11 @@ return {
                       <td key={career.id} style={rowStyle}>
                         {career.score !== null ? (
                           <span
-                            className={`match-badge ${
-                              career.score >= 90
-                                ? 'match-high'
-                                : 'match-med'
-                            }`}
+                            className="match-badge"
+                            title={isOnetId(career.id) ? getMatchPresentation(career.score).label : 'Legacy prototype estimate'}
+                            style={{ backgroundColor: getMatchPresentation(career.score).background, color: getMatchPresentation(career.score).color }}
                           >
-                            {career.score}% Estimated Match
+                            {career.score}% {isOnetId(career.id) ? 'Estimated Match' : 'Prototype Match'}
                           </span>
                         ) : (
                           'Not available'
@@ -418,7 +419,7 @@ return {
 
                   <tr>
                     <td style={{ ...rowStyle, fontWeight: 700 }}>
-                      Core Strengths Leveraged
+                      Key Occupational Skills
                     </td>
 
                     {comparingCareers.map((career) => (
@@ -432,7 +433,7 @@ return {
 
                   <tr style={{ backgroundColor: '#FAF9F6' }}>
                     <td style={{ ...rowStyle, fontWeight: 700 }}>
-                      Why It Fits You
+                      Why It May Fit You
                     </td>
 
                     {comparingCareers.map((career) => (
