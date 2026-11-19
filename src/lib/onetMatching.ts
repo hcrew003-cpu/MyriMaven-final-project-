@@ -144,31 +144,51 @@ const SKILL_TERMS: Record<string, string[]> = {
 };
 
 const GOAL_TERMS: Record<string, string[]> = {
-  Growth: [
-    'professional development',
-    'continuing education',
-    'continuing professional development',
-  ],
   Leadership: [
-    'management', 'supervis',
-    'leadership', 'direct operations',
+    'supervise staff', 'supervise employees', 'manage staff',
+    'manage personnel', 'lead teams', 'leadership', 'direct operations',
+    'coordinate teams', 'staff development', 'management of personnel',
   ],
   'Helping others': [
-    'patient care', 'counsel', 'community outreach',
-    'social service', 'teach', 'rehabilitation',
-    'advocacy', 'social work', 'provide care',
+    'patient care', 'counsel', 'community outreach', 'social service',
+    'teach', 'rehabilitation', 'advocacy', 'social work', 'provide care',
+    'mental health', 'psychotherapy', 'psychological treatment',
+    'emotional support', 'assist clients', 'support individuals',
+    'treat mental', 'treat patients', 'help people', 'behavioral health',
   ],
   Creativity: [
-    'design', 'creative', 'artistic',
-    'originality',
+    'creative', 'artistic', 'originality', 'design concepts',
+    'visual design', 'graphic design', 'develop concepts',
+    'content creation', 'promotional campaigns', 'create artwork',
+    'design products', 'design layouts', 'brand strategy',
   ],
   'Making an impact': [
-    'community outreach', 'conservation',
-    'environmental protection', 'public health',
-    'social service', 'public safety',
-    'pollution prevention',
+    'community outreach', 'conservation', 'environmental protection',
+    'public health', 'social service', 'public safety', 'pollution prevention',
+    'mental health', 'psychological well-being', 'psychological wellbeing',
+    'emotional well-being', 'quality of life', 'behavioral health',
+    'treat mental', 'psychotherapy', 'rehabilitation', 'prevent disease',
+    'improve health', 'improve patient outcomes', 'health promotion',
+    'community development', 'educational outcomes', 'student achievement',
+    'protect natural resources', 'reduce pollution', 'restore ecosystems',
+    'improve access', 'disability support', 'social work',
   ],
 };
+
+// Goals describe the purpose of work. Prioritize documented duties,
+// not generic skill or knowledge mentions. This is a heuristic,
+// not a measurement of actual social impact or employer outcomes.
+function goalEvidence(sections: Sections, terms: readonly string[]) {
+  const description = matchingTerms(sections.description, terms);
+  const tasks = matchingTerms(sections.tasks, terms);
+  const coverage = (hits: string[]) =>
+    hits.length === 0 ? 0 : hits.length === 1 ? 0.7 : hits.length === 2 ? 0.9 : 1;
+  const available = (sections.description ? 45 : 0) + (sections.tasks ? 55 : 0);
+  return {
+    score: Math.round((45 * coverage(description) + 55 * coverage(tasks)) / Math.max(75, available) * 100),
+    evidence: [...new Set([...description, ...tasks])],
+  };
+}
 
 // Preference evidence comes from O*NET occupation content.
 // These terms are exploratory indicators, not validated
@@ -1048,8 +1068,11 @@ export function calculateOnetMatch(
   const goalScores: number[] = [];
   const unsupportedGoals: string[] = [];
 
+  const seenGoals = new Set<string>();
   for (const rawGoal of selectedGoals) {
     const goal = normalizeGoal(rawGoal);
+    if (seenGoals.has(goal)) continue;
+    seenGoals.add(goal);
     const terms = GOAL_TERMS[goal];
 
     // Unsupported goals are excluded rather than
@@ -1066,9 +1089,11 @@ export function calculateOnetMatch(
       continue;
     }
 
-    const evidence = evidenceStrength(sections, terms);
-
-    if (!(sections.description || sections.tasks || sections.skills || sections.knowledge)) continue;
+    if (!(sections.description || sections.tasks)) {
+      unsupportedGoals.push(rawGoal);
+      continue;
+    }
+    const evidence = goalEvidence(sections, terms);
     goalScores.push(evidence.score);
 
     if (evidence.score >= 35) {
