@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useCareer, type OnetCareer } from '../context/CareerContext';
+import { calculateOnetMatch } from '../lib/onetMatching';
+import { getMatchPresentation } from '../lib/matchPresentation';
 import { CAREERS } from '../data/careersData';
 import { loadCareerNotes, saveCareerNote, deleteCareerNote } from '../lib/careerNotes';
 import {
@@ -20,6 +22,7 @@ const isOnetId = (id: string) =>
 export default function SavedView() {
   const {
     savedCareerIds,
+    userProfile,
     authUser,
     toggleSaveCareer,
     setSelectedCareerId,
@@ -191,7 +194,9 @@ export default function SavedView() {
         onet?.description ??
         'Occupation information is being loaded or is temporarily unavailable.',
       category: 'O*NET Occupation',
-      match: null as number | null,
+      match: onet?.id && onet.title && !loadErrors.includes(id)
+        ? calculateOnetMatch(onet, userProfile).score
+        : null,
       isOnet: true,
       unavailable: loadErrors.includes(id),
     };
@@ -321,6 +326,9 @@ export default function SavedView() {
             >
               {savedCareers.map((career) => {
                 const inCompare = isComparing(career.id);
+                const presentation = career.match !== null
+                  ? getMatchPresentation(career.match)
+                  : null;
 
                 return (
                   <div
@@ -376,15 +384,13 @@ export default function SavedView() {
                               {career.category}
                             </span>
 
-                            {career.match !== null && (
+                            {presentation && (
                               <span
-                                className={`match-badge ${
-                                  career.match >= 90
-                                    ? 'match-high'
-                                    : 'match-med'
-                                }`}
+                                className="match-badge"
+                                title={career.isOnet ? presentation.label : 'Legacy prototype estimate'}
+                                style={{ backgroundColor: presentation.background, color: presentation.color }}
                               >
-                                {career.match}% Match
+                                {career.match}% {career.isOnet ? 'Estimated Match' : 'Prototype Match'}
                               </span>
                             )}
 
