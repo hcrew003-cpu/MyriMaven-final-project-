@@ -6,6 +6,7 @@ import { useCareer } from '../context/CareerContext';
 import type { OnetCareer } from '../context/CareerContext';
 import type { WhatIfState, UserProfile } from '../types/career';
 import { calculateOnetMatch } from '../lib/onetMatching';
+import { useOnetRecommendations } from '../hooks/useOnetRecommendations';
 import { getMatchPresentation } from '../lib/matchPresentation';
 import { ALL_INTERESTS, ALL_SKILLS } from '../data/careersData';
 import {
@@ -31,11 +32,6 @@ import {
 
 type PreferenceKey = keyof UserProfile['preferences'];
 
-type CatalogCareer = {
-  id: string;
-  title: string;
-};
-
 type ScenarioCareer = {
   career: OnetCareer;
   baseline: number;
@@ -46,7 +42,7 @@ type ScenarioCareer = {
   confidence: string;
 };
 
-const DETAIL_LIMIT = 36;
+
 
 const priorities: {
   key: keyof WhatIfState;
@@ -105,53 +101,6 @@ const preferences: {
   },
 ];
 
-const INTEREST_TERMS: Record<string, string[]> = {
-  technology: [
-    'software', 'computer', 'network',
-    'information', 'cyber', 'web',
-  ],
-  business: [
-    'business', 'manager', 'marketing',
-    'finance', 'account', 'sales', 'operations',
-  ],
-  'helping people': [
-    'social', 'counsel', 'health',
-    'teacher', 'therap', 'advisor',
-  ],
-  creativity: [
-    'design', 'artist', 'writer',
-    'media', 'creative', 'architect',
-  ],
-  environment: [
-    'environment', 'conservation',
-    'agricultur', 'forestry', 'wildlife',
-  ],
-  'problem solving': [
-    'analyst', 'engineer', 'scientist',
-    'research', 'investigator',
-  ],
-  leadership: [
-    'manager', 'director', 'executive',
-    'supervisor', 'administrator',
-  ],
-  'working with data': [
-    'data', 'statistic', 'analyst',
-    'research', 'financial',
-  ],
-  communication: [
-    'writer', 'marketing', 'teacher',
-    'communications', 'reporter',
-  ],
-  healthcare: [
-    'medical', 'nurs', 'health',
-    'patient', 'therap', 'clinical',
-  ],
-  entrepreneurship: [
-    'business', 'manager', 'marketing',
-    'sales', 'product', 'executive',
-  ],
-};
-
 function toFivePointScale(value: number): number {
   return Math.max(
     1,
@@ -161,79 +110,6 @@ function toFivePointScale(value: number): number {
 
 function toHundredPointScale(rating: number): number {
   return (rating - 1) * 25;
-}
-
-function selectCandidates(
-  catalog: CatalogCareer[],
-  profile: UserProfile
-): CatalogCareer[] {
-  const labels = [
-    ...profile.interests,
-    ...profile.goals,
-  ];
-
-  const terms = labels.flatMap((label) => {
-    const normalized = label.toLowerCase().trim();
-
-    return [
-      ...(INTEREST_TERMS[normalized] ?? []),
-      ...normalized
-        .split(/[^a-z0-9]+/)
-        .filter((word) => word.length > 3),
-    ];
-  });
-
-  const ranked = catalog
-    .map((career) => ({
-      career,
-      hits: terms.filter((term) =>
-        career.title.toLowerCase().includes(term)
-      ).length,
-    }))
-    .sort(
-      (a, b) =>
-        b.hits - a.hits ||
-        a.career.title.localeCompare(b.career.title)
-    );
-
-  const relevant = ranked
-    .filter((item) => item.hits > 0)
-    .map((item) => item.career);
-
-  const others = ranked
-    .filter((item) => item.hits === 0)
-    .map((item) => item.career);
-
-  const selected: CatalogCareer[] = [];
-  let index = 0;
-
-  while (
-    selected.length < DETAIL_LIMIT &&
-    (index * 3 < relevant.length ||
-      index < others.length)
-  ) {
-    for (let j = 0; j < 3; j++) {
-      const career = relevant[index * 3 + j];
-
-      if (
-        career &&
-        selected.length < DETAIL_LIMIT
-      ) {
-        selected.push(career);
-      }
-    }
-
-    if (
-      others[index] &&
-      selected.length < DETAIL_LIMIT
-    ) {
-      selected.push(others[index]);
-    }
-
-    index++;
-  }
-
-  return selected;
 }
 
 export default function WhatIfView() {
@@ -258,13 +134,6 @@ export default function WhatIfView() {
     isComparing,
     openMayaWithPrompt,
   } = useCareer();
-
-  const [catalog, setCatalog] = useState<CatalogCareer[]>([]);
-  const [onetCareers, setOnetCareers] = useState<OnetCareer[]>([]);
-  const [loadingCatalog, setLoadingCatalog] = useState(true);
-  const [loadingDetails, setLoadingDetails] = useState(false);
-  const [error, setError] = useState('');
-  const [reloadKey, setReloadKey] = useState(0);
 
   const [scenarioName, setScenarioName] = useState('');
   const [savedScenarios, setSavedScenarios] = useState<SavedWhatIfScenario[]>([]);
@@ -375,200 +244,35 @@ const handleLoadScenario = (
     (whatIfSkills[label] ?? 3) !== (userProfile.skills[label] ?? 3)
   ).length;
 
-  const scenarioProfile = useMemo(() => ({
+  // Alternative priorities replace saved goals only when explicitly selected.
+  const scenarioProfile = useMemo<UserProfile>(() => ({
     ...userProfile,
     interests: whatIfInterests,
     skills: whatIfSkills,
-  }), [userProfile, whatIfInterests, whatIfSkills]);
+    preferences: whatIfPreferences,
+    goals: priorities.some(({ key }) => whatIfToggles[key])
+      ? priorities.filter(({ key }) => whatIfToggles[key]).map(({ label }) => label)
+      : userProfile.goals,
+  }), [userProfile, whatIfInterests, whatIfSkills, whatIfPreferences, whatIfToggles]);
 
-  const isBaseline =
-    activePriorities.length === 0 &&
-    changedPreferences.length === 0 &&
-    !changedInterests && changedSkills === 0;
+  const isBaseline = activePriorities.length === 0 && changedPreferences.length === 0 && !changedInterests && changedSkills === 0;
+  const { catalog, rankedCareers: scenarioResults, loadingCatalog, loadingDetails, error, reload } = useOnetRecommendations(isBaseline ? userProfile : scenarioProfile);
 
-  // Load the same complete O*NET catalog used by Recommendations.
-  useEffect(() => {
-    const controller = new AbortController();
-
-    setLoadingCatalog(true);
-    setError('');
-    setCatalog([]);
-    setOnetCareers([]);
-
-    fetch('/api/onet/catalog', {
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error('Could not load O*NET careers.');
-        }
-
-        return response.json();
-      })
-      .then((data) => {
-        if (!controller.signal.aborted) {
-          setCatalog(
-            Array.isArray(data.careers)
-              ? data.careers
-              : []
-          );
-        }
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'Unable to load careers.'
-          );
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoadingCatalog(false);
-        }
-      });
-
-    return () => controller.abort();
-  }, [reloadKey]);
-
-  // Use the saved profile to choose candidates.
-  // Temporary What-If changes do not alter this candidate pool.
-  const candidates = useMemo(
-    () => selectCandidates(catalog, scenarioProfile),
-    [catalog, scenarioProfile]
-  );
-
-  const candidateKey = candidates
-    .map((career) => career.id)
-    .join(',');
-
-  // Fetch detailed occupation information in small batches.
-  useEffect(() => {
-    if (!candidateKey) {
-      setOnetCareers([]);
-      setLoadingDetails(false);
-      return;
-    }
-
-    const controller = new AbortController();
-    const ids = candidateKey.split(',');
-
-    setOnetCareers([]);
-    setLoadingDetails(true);
-
-    async function loadDetails() {
-      const loaded: OnetCareer[] = [];
-
-      try {
-        for (
-          let index = 0;
-          index < ids.length &&
-          !controller.signal.aborted;
-          index += 4
-        ) {
-          const batch = await Promise.allSettled(
-            ids.slice(index, index + 4).map(
-              async (id) => {
-                const response = await fetch(
-                  `/api/onet/occupation?code=${encodeURIComponent(id)}`,
-                  { signal: controller.signal }
-                );
-
-                if (!response.ok) {
-                  throw new Error(
-                    'Occupation details unavailable'
-                  );
-                }
-
-                return (
-                  await response.json()
-                ) as OnetCareer;
-              }
-            )
-          );
-
-          if (controller.signal.aborted) return;
-
-          const successful = batch
-            .filter(
-              (
-                result
-              ): result is PromiseFulfilledResult<OnetCareer> =>
-                result.status === 'fulfilled'
-            )
-            .map((result) => result.value)
-            .filter(
-              (career) =>
-                Boolean(career.id && career.title)
-            );
-
-          loaded.push(...successful);
-          setOnetCareers([...loaded]);
-        }
-
-        if (
-          loaded.length === 0 &&
-          !controller.signal.aborted
-        ) {
-          setError(
-            'Occupation details could not be loaded. Please try again.'
-          );
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoadingDetails(false);
-        }
-      }
-    }
-
-    void loadDetails();
-
-    return () => controller.abort();
-  }, [candidateKey]);
-
-  // Calculate saved-profile and What-If estimates
-  // with the same O*NET matching function.
-  const rankedCareers = useMemo<ScenarioCareer[]>(() => {
-    return onetCareers
-      .map((career) => {
-        const baseline = calculateOnetMatch(
-          career,
-          userProfile
-        );
-
-       
-const scenario = calculateOnetMatch(
-  career,
-  userProfile,
-  whatIfToggles,
-  whatIfPreferences,
-  scenarioProfile
-);
-
-
-        return {
-          career,
-          baseline: baseline.score,
-          score: scenario.score,
-          delta: scenario.score - baseline.score,
-          reasons: scenario.reasons,
-          considerations: scenario.considerations,
-          confidence: scenario.confidence,
-        };
-      })
-      .sort((a, b) => b.score - a.score);
- 
-}, [
-  onetCareers,
-  userProfile,
-  whatIfToggles,
-  whatIfPreferences,
-  scenarioProfile,
-]);
-
+  const rankedCareers = useMemo<ScenarioCareer[]>(() => scenarioResults.map(({ career, match }) => {
+    const baseline = calculateOnetMatch(career, userProfile);
+    return {
+      career,
+      baseline: baseline.score,
+      score: match.score,
+      delta: match.score - baseline.score,
+      reasons: match.reasons,
+      considerations: match.considerations,
+      confidence: match.confidence,
+    };
+  }), [scenarioResults, userProfile]);
 
   const top = rankedCareers[0];
+  const unscored = [...new Set(rankedCareers.flatMap(item => item.considerations.filter(text => text.startsWith('Not scored:'))))];
 
   const improved = rankedCareers.filter(
     (item) => item.delta > 0
@@ -729,7 +433,7 @@ const scenario = calculateOnetMatch(
               marginTop: 14,
             }}
           >
-            Scenario priorities are tested against
+            Selected priorities replace your saved goals for this scenario only. With none selected, your saved goals remain active. Scenario priorities are tested against
             available occupation evidence. Some
             priorities, such as salary and work-life
             balance, need additional O*NET data
@@ -978,10 +682,10 @@ Work location is estimated only when duties provide clear on-site evidence; remo
                 : isBaseline
                   ? `Baseline scenario: ${
                       top?.career.title ?? 'No occupation'
-                    } currently ranks highest among the evaluated occupations.`
+                    } currently ranks highest by the shared recommendation ranking among the evaluated occupations.`
                   : `${changedInterests ? 'Interests changed; ' : ''}${changedSkills} skills adjusted, ${activePriorities.length} priorities selected and ${changedPreferences.length} work preferences adjusted. Among the evaluated occupations, ${improved} estimates increased and ${decreased} decreased. ${
                       top?.career.title ?? 'No occupation'
-                    } currently ranks highest.`}
+                    } currently ranks highest by the shared recommendation ranking.`}
           </p>
 
           <p
@@ -998,6 +702,7 @@ Work location is estimated only when duties provide clear on-site evidence; remo
           </p>
         </div>
 
+        {unscored.length > 0 && <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>{unscored.join(' · ')}</p>}
         {error && (
           <div
             className="card"
@@ -1010,9 +715,7 @@ Work location is estimated only when duties provide clear on-site evidence; remo
 
             <button
               className="btn-primary btn-sm"
-              onClick={() =>
-                setReloadKey((value) => value + 1)
-              }
+              onClick={reload}
             >
               Retry
             </button>
@@ -1047,7 +750,7 @@ Work location is estimated only when duties provide clear on-site evidence; remo
           >
             {loadingCatalog || loadingDetails
               ? 'Loading career details...'
-              : `Selected from ${catalog.length} O*NET occupations`}
+              : `Evaluated ${rankedCareers.length} of ${catalog.length} O*NET occupations`}
           </span>
         </div>
 
@@ -1094,7 +797,7 @@ Work location is estimated only when duties provide clear on-site evidence; remo
                             marginTop: 5,
                           }}
                         >
-                          TOP ESTIMATED FIT
+                          TOP RANKED CAREER
                         </span>
                       )}
                     </div>
@@ -1168,10 +871,10 @@ Work location is estimated only when duties provide clear on-site evidence; remo
                       'Review the occupation details to learn more.'}
                   </div>
 
-                  {item.considerations.length > 0 && (
+                  {item.considerations.some(text => !text.startsWith('Not scored:')) && (
                     <div className="watchout-box">
                       <strong>Consider: </strong>
-                      {item.considerations[0]}
+                      {item.considerations.find(text => !text.startsWith('Not scored:'))}
                     </div>
                   )}
 
