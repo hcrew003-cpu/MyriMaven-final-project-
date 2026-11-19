@@ -8,7 +8,7 @@ export type CatalogCareer = {
   jobZone: string | null;
 };
 
-export const DETAIL_LIMIT = 100;
+export const DETAIL_LIMIT = 150;
 
 
 const TOPIC_TERMS: Record<string, string[]> = {
@@ -320,9 +320,9 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
   const add = (item: Item, limit: number, diverse = true) => {
     const {career} = item;
     const group = career.id.split('-')[0];
-    const family = career.title.toLowerCase().replace(/[^a-z ]/g,' ').trim().split(/\s+/).slice(0,2).join(' ');
+    const family = career.id.split('.')[0].slice(0,5);
     if (ids.has(career.id) || selected.length >= limit) return false;
-    if (diverse && ((groups.get(group) ?? 0) >= Math.ceil(DETAIL_LIMIT * 0.13) || (families.get(family) ?? 0) >= 2)) return false;
+    if (diverse && ((groups.get(group) ?? 0) >= Math.ceil(DETAIL_LIMIT * 0.13) || (families.get(family) ?? 0) >= 3)) return false;
     selected.push(career); ids.add(career.id);
     groups.set(group,(groups.get(group) ?? 0)+1);
     families.set(family,(families.get(family) ?? 0)+1);
@@ -341,7 +341,7 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
     }
   };
   const limit = Math.min(DETAIL_LIMIT,catalog.length);
-  const mainLimit = Math.max(0,limit-Math.floor(limit/10));
+  const mainLimit = Math.max(0,limit-Math.floor(limit/5));
   const pools = [
     ...interests.map((_,i) => ranked.filter(item => item.interestHits[i]>=0.5)),
     ...skills.map((_,i) => ranked.filter(item => item.skillHits[i]>=0.5)),
@@ -358,11 +358,24 @@ export function selectOnetCandidates(catalog: CatalogCareer[], profile: UserProf
     const reservedLimit = Math.min(mainLimit, 8);
     for (const item of connected) add(item, reservedLimit);
   }
-  roundRobin(pools,mainLimit);
-  for (const item of ranked) if (item.score>0) add(item,mainLimit);
-  const exploration = Object.keys(TOPIC_TERMS).filter(label => !interests.includes(label)).map(label => ranked.filter(item => titleStrength(item.career.title,TOPIC_TERMS[label])>=0.5 && (item.interestHits.some(hit => hit >= 0.5) || item.goalHits.some(hit => hit >= 0.5) || item.skillHits.filter(hit => hit >= 0.5).length >= 2 || item.background > 0)));
-  roundRobin(exploration,limit);
-  for (const item of ranked) add(item,limit);
-  for (const item of ranked) add(item,limit,false);
+  // Load a strong primary foundation first, then reserve room for
+  // cross-topic candidates before the main diversity caps are exhausted.
+  const foundationLimit = Math.min(mainLimit, Math.ceil(limit * 0.4));
+  roundRobin(pools, foundationLimit);
+  for (const item of ranked) if (item.score > 0) add(item, foundationLimit);
+  const exploration = Object.keys(TOPIC_TERMS)
+    .filter(label => !interests.includes(label))
+    .map(label => ranked.filter(item =>
+      titleStrength(item.career.title, TOPIC_TERMS[label]) >= 0.5 &&
+      (item.interestHits.some(hit => hit >= 0.5) ||
+       item.goalHits.some(hit => hit >= 0.5) ||
+       item.skillHits.filter(hit => hit >= 0.5).length >= 2)
+    ).sort((a,b) => (b.score - 1.5*b.background) - (a.score - 1.5*a.background) || a.career.title.localeCompare(b.career.title)));
+  const beforeExploration = selected.length;
+  roundRobin(exploration, Math.min(limit, beforeExploration + Math.floor(limit/5)));
+  roundRobin(pools, limit);
+  for (const item of ranked) if (item.score > 0) add(item, limit);
+  for (const item of ranked) add(item, limit);
+  for (const item of ranked) add(item, limit, false);
   return selected;
 }
