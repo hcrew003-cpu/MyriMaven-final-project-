@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { useCareer } from '../context/CareerContext';
+import { useCareer, type OccupationalFilter } from '../context/CareerContext';
 import { useOnetRecommendations } from '../hooks/useOnetRecommendations';
 import { getMatchPresentation } from '../lib/matchPresentation';
 import {
@@ -16,7 +16,7 @@ import {
   Sliders,
 } from 'lucide-react';
 
-type Filter = 'all' | 'creative' | 'business' | 'tech';
+type Filter = OccupationalFilter;
 
 type ExplorationFilter = 'all' | 'best' | 'related' | 'unexpected';
 const EXPLORATION_OPTIONS: [ExplorationFilter, string][] = [
@@ -63,31 +63,15 @@ function occupationalField(id: string): string {
   return OCCUPATIONAL_FIELDS[id.split("-")[0]] ?? "Other / unclassified occupation";
 }
 
-function categoryMatch(
-  title: string,
-  filter: Filter
-): boolean {
-  const value = title.toLowerCase();
-
-  if (filter === 'creative') {
-    return /design|artist|writer|media|advertis|creative|architect/.test(
-      value
-    );
-  }
-
-  if (filter === 'business') {
-    return /manager|business|market|sales|financ|account|human resources|executive/.test(
-      value
-    );
-  }
-
-  if (filter === 'tech') {
-    return /software|computer|information technology|data|cyber|network|web/.test(
-      value
-    );
-  }
-
-  return true;
+function categoryMatch(id: string, filter: Filter): boolean {
+  const group = id.split('-')[0];
+  if (filter === 'all') return true;
+  if (filter === 'other') return !Object.prototype.hasOwnProperty.call(OCCUPATIONAL_FIELDS, group);
+  // Preserve compatibility with existing navigation callers.
+  if (filter === 'creative') return group === '27';
+  if (filter === 'business') return ['11', '13', '41'].includes(group);
+  if (filter === 'tech') return group === '15';
+  return group === filter;
 }
 
 export default function RecommendationsView() {
@@ -190,7 +174,7 @@ export default function RecommendationsView() {
     () =>
       catalog.filter(
         (career) =>
-          categoryMatch(career.title, filter) &&
+          categoryMatch(career.id, filter) &&
           `${career.title} ${career.id}`
             .toLowerCase()
             .includes(query.trim().toLowerCase())
@@ -380,40 +364,21 @@ export default function RecommendationsView() {
             )}
 
             {mode === 'browse' ? (
-            <div
-              style={{
-                display: 'flex',
-                gap: 8,
-                flexWrap: 'wrap',
-                marginBottom: 20,
-              }}
-            >
-              {(
-                [
-                  ['all', 'All Fields'],
-                  ['creative', 'Creative & Design'],
-                  ['business', 'Business & Leadership'],
-                  ['tech', 'Technology'],
-                ] as [Filter, string][]
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  className={`tag-chip ${
-                    filter === key ? 'active' : ''
-                  }`}
-                  onClick={() => {
-                    setFilter(key);
-                    setPage(1);
-                  }}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: 24,
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+              <div style={{ marginBottom: 20 }}>
+                <label htmlFor="onet-field-filter" style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>
+                  Occupational field
+                </label>
+                <select id="onet-field-filter" value={filter}
+                  onChange={(e) => { setFilter(e.target.value as Filter); setPage(1); }}
+                  style={{ width: '100%', maxWidth: 520, padding: 12, borderRadius: 10, border: '1px solid var(--border-strong)', background: '#fff' }}>
+                  <option value="all">All Fields ({catalog.length})</option>
+                  {(['creative', 'business', 'tech'] as Filter[]).includes(filter) && <option value={filter}>Previous field selection</option>}
+                  {Object.entries(OCCUPATIONAL_FIELDS).map(([code, label]) => (
+                    <option key={code} value={code}>{label} ({catalog.filter(c => c.id.split('-')[0] === code).length})</option>
+                  ))}
+                  <option value="other">Other / unclassified ({catalog.filter(c => categoryMatch(c.id, 'other')).length})</option>
+                </select>
+              </div>
 
             ) : (
               <div style={{ marginBottom: 20 }}>
