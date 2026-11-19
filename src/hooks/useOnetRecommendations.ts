@@ -4,15 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { useCareer } from '../context/CareerContext';
 import type { OnetCareer } from '../context/CareerContext';
 import { calculateOnetMatch } from '../lib/onetMatching';
-import {
-  selectOnetCandidates,
-  getCareerBackgroundRelevance,
-} from '../lib/onetRecommendations';
+import type { UserProfile } from '../types/career';
+import { selectOnetCandidates, getCareerBackgroundRelevance } from '../lib/onetRecommendations';
 import type { CatalogCareer } from '../lib/onetRecommendations';
 
 export type RankedOnetCareer = {
   career: OnetCareer;
   match: ReturnType<typeof calculateOnetMatch>;
+  background: ReturnType<typeof getCareerBackgroundRelevance>;
+  rankingScore: number;
 };
 
 // Shared caches survive navigation between app views.
@@ -68,8 +68,9 @@ async function fetchOccupation(id: string): Promise<OnetCareer> {
   return request;
 }
 
-export function useOnetRecommendations() {
-  const { userProfile } = useCareer();
+export function useOnetRecommendations(profileOverride?: UserProfile) {
+  const { userProfile: savedProfile } = useCareer();
+  const userProfile = profileOverride ?? savedProfile;
   const [catalog, setCatalog] = useState<CatalogCareer[]>(() => catalogCache ?? []);
   const [careers, setCareers] = useState<OnetCareer[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(() => catalogCache === null);
@@ -94,12 +95,19 @@ export function useOnetRecommendations() {
     return () => { cancelled = true; };
   }, [reloadKey]);
 
- 
-const candidates = useMemo(
-  () => selectOnetCandidates(catalog, userProfile),
-  [catalog, userProfile]
-);
-
+  const candidates = useMemo(
+    () => selectOnetCandidates(catalog, userProfile),
+    [
+      catalog,
+      userProfile.interests,
+      userProfile.goals,
+      userProfile.useCareerBackground,
+      userProfile.major,
+      userProfile.minor,
+      userProfile.completedDegree,
+      userProfile.currentCareer,
+    ]
+  );
 
   const candidateKey = candidates.map((career) => career.id).join(',');
 
@@ -111,6 +119,7 @@ const candidates = useMemo(
       return;
     }
 
+    setError('');
     const ids = candidateKey.split(',');
     const loaded = new Map<string, OnetCareer>();
     for (const id of ids) {
@@ -157,40 +166,20 @@ const candidates = useMemo(
         () => worker()
       )
     ).finally(() => {
-      if (!cancelled) setLoadingDetails(false);
+      if (!cancelled) {
+        setLoadingDetails(false);
+        if (loaded.size < ids.length) setError(`Loaded ${loaded.size} of ${ids.length} selected occupations. Retry to load missing details.`);
+      }
     });
 
     return () => { cancelled = true; };
-  }, [candidateKey]);
+  }, [candidateKey, reloadKey]);
 
-  
-const rankedCareers = useMemo(() => {
-  return careers
-    .map((career) => {
-      const match = calculateOnetMatch(career, userProfile);
-
-      const background = getCareerBackgroundRelevance(
-        career,
-        userProfile
-      );
-
-      const rankingScore =
-        match.score + background.strength * 8;
-
-      return {
-        career,
-        match,
-        background,
-        rankingScore,
-      };
-    })
-    .sort(
-      (a, b) =>
-        b.rankingScore - a.rankingScore ||
-        b.match.score - a.match.score
-    );
-}, [careers, userProfile]);
-
+  const rankedCareers = useMemo<RankedOnetCareer[]>(() => careers.map(career => {
+    const match = calculateOnetMatch(career, userProfile);
+    const background = getCareerBackgroundRelevance(career, userProfile);
+    return { career, match, background, rankingScore: match.score + background.strength * 8 };
+  }).sort((a, b) => b.rankingScore - a.rankingScore || b.match.score - a.match.score), [careers, userProfile]);
 
   return {
     catalog,
