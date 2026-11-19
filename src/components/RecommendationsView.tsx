@@ -28,7 +28,7 @@ const EXPLORATION_OPTIONS: [ExplorationFilter, string][] = [
 const EXPLORATION_DESCRIPTIONS: Record<ExplorationFilter, string> = {
   best: 'Your strongest available matches, balancing occupational alignment and overall compatibility. Review individual estimates and evidence before deciding.',
   related: 'Explore careers that build on your interests, strengths or enabled career background.',
-  unexpected: 'Discover careers outside your leading occupational fields that still connect to your profile.',
+  unexpected: 'Discover careers outside your leading occupational fields through transferable skills, interests or goals.',
   all: 'View every evaluated occupation, including those with limited matching evidence.',
 };
 const PAGE_SIZE = 30;
@@ -123,14 +123,15 @@ export default function RecommendationsView() {
       const group = entry.career.id.split('-')[0];
       const family = entry.career.id.slice(0, 5);
       const relatedCodes = new Set((entry.career.relatedOccupations?.occupation ?? []).map(item => item.code));
-      const evidence = alignment >= 25 || dutyPeak >= 35 || goal >= 45;
-      const transfer = skill >= 45 && (dutyPeak >= 30 || goal >= 35 || alignment >= 25);
+      const evidence = alignment >= 25 || dutyPeak >= 30 || goal >= 40;
+      const transfer = skill >= 55 && (dutyPeak >= 20 || goal >= 25 || alignment >= 20);
       const support = alignment * .40 + dutyPeak * .25 + skill * .20 + goal * .15;
-      const bestRank = entry.match.score * .60 + alignment * .25 + dutyPeak * .15 + background * 2;
+      const bestRank = entry.match.score * .70 + alignment * .20 + dutyPeak * .10 + background * 2;
       return { entry, group, family, relatedCodes, alignment, skill, goal, dutyPeak, dutyCount, coreCount, background, evidence, transfer, support, bestRank };
     });
     type Row = (typeof rows)[number];
     const diverse = (pool: Row[], limit: number, familyLimit: number, groupLimit: number) => {
+      if (limit <= 0) return [];
       const families = new Map<string, number>();
       const groups = new Map<string, number>();
       const result: Row[] = [];
@@ -144,23 +145,22 @@ export default function RecommendationsView() {
       return result;
     };
     const eligible = rows.filter(row => row.entry.match.reasons.length > 0 && (row.evidence || row.transfer));
-    const best = diverse(eligible.filter(row => row.evidence && row.entry.match.score >= 40)
-      .sort((a,b) => b.bestRank-a.bestRank || b.entry.match.score-a.entry.match.score), 12, 2, 5);
-    // Use the strongest available careers as anchors, rather than the background alone.
-    const anchors = best.slice(0, 6);
+    const bestPool = eligible.filter(row => row.evidence && row.entry.match.score >= 40)
+      .sort((a,b) => b.bestRank-a.bestRank || b.entry.match.score-a.entry.match.score);
+    // Protect the strongest six; apply diversity only to the remaining slots.
+    const anchors = bestPool.slice(0, 6);
+    const anchorIds = new Set(anchors.map(row => row.entry.career.id));
+    const best = [...anchors, ...diverse(bestPool.filter(row => !anchorIds.has(row.entry.career.id)), 12 - anchors.length, 2, 4)];
     const bestIds = new Set(best.map(row => row.entry.career.id));
     const remaining = eligible.filter(row => !bestIds.has(row.entry.career.id));
     const linked = (a: Row, b: Row) => a.relatedCodes.has(b.entry.career.id) || b.relatedCodes.has(a.entry.career.id);
-    // Healthcare practice and healthcare support share a broad work domain.
-    // All other groups retain their own identity; explicit O*NET links bridge fields.
     const domain = (group: string) => group === '29' || group === '31' ? 'healthcare' : group;
     const adjacent = (row: Row) => anchors.some(anchor => row.family === anchor.family || linked(row, anchor) || domain(row.group) === domain(anchor.group));
-    const bridge = (row: Row) => row.background > 0 && row.coreCount > 0 && row.dutyPeak >= 35;
-    const related = diverse(remaining.filter(row => (adjacent(row) || bridge(row)) && row.evidence)
-      .sort((a,b) => (b.support + b.entry.match.score * .35 + b.background * 4) - (a.support + a.entry.match.score * .35 + a.background * 4)), 12, 2, 5);
+    const related = diverse(remaining.filter(row => adjacent(row) && (row.evidence || row.transfer))
+      .sort((a,b) => (b.support + b.entry.match.score * .35 + b.background * 2) - (a.support + a.entry.match.score * .35 + a.background * 2)), 12, 3, 5);
     const relatedIds = new Set(related.map(row => row.entry.career.id));
-    const unexpected = diverse(remaining.filter(row => !relatedIds.has(row.entry.career.id) && !adjacent(row) && !bridge(row) &&
-      ((row.coreCount > 0 && row.dutyPeak >= 40) || (row.transfer && (row.dutyCount >= 2 || row.goal >= 40))))
+    const unexpected = diverse(remaining.filter(row => !relatedIds.has(row.entry.career.id) && !adjacent(row) && row.entry.match.score >= 40 &&
+      ((row.coreCount > 0 && row.dutyPeak >= 30) || row.transfer || (row.dutyPeak >= 25 && row.goal >= 30)))
       .sort((a,b) => (b.support + b.entry.match.score * .30) - (a.support + a.entry.match.score * .30)), 8, 1, 2);
     return { all: rankedCareers, best: best.map(row => row.entry), related: related.map(row => row.entry), unexpected: unexpected.map(row => row.entry) };
   }, [rankedCareers, userProfile.useCareerBackground]);
@@ -475,7 +475,7 @@ export default function RecommendationsView() {
                         className="career-card"
                       >
                         <div>
-                          <div className="career-card-header">
+                          <div className="career-card-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
                             <span className="career-category">
                               {occupationalField(career.id)}
                             </span>
@@ -485,6 +485,7 @@ export default function RecommendationsView() {
                               title={getMatchPresentation(match.score).label}
                               aria-label={`${match.score}% Estimated Match — ${getMatchPresentation(match.score).label}`}
                               style={{
+                                whiteSpace: 'nowrap', flexShrink: 0,
                                 backgroundColor: getMatchPresentation(match.score).background,
                                 color: getMatchPresentation(match.score).color,
                               }}
