@@ -4,6 +4,7 @@
 import React from 'react';
 import { useCareer } from '../context/CareerContext';
 import { useOnetRecommendations } from '../hooks/useOnetRecommendations';
+import { getMatchPresentation } from '../lib/matchPresentation';
 import {
   Sparkles,
   Sliders,
@@ -55,7 +56,7 @@ export default function DashboardView() {
   const evaluatedCount = rankedCareers.length;
 
   const highMatchCount = rankedCareers.filter(
-    ({ match }) => match.score >= 80
+    ({ match }) => match.score >= 70
   ).length;
 
   const topMatches = rankedCareers.slice(0, 3);
@@ -109,7 +110,7 @@ export default function DashboardView() {
       value: loadingCatalog ? '...' : evaluatedCount,
       detail: isLoading
         ? 'Finding career matches...'
-        : `${highMatchCount} estimated matches at 80%+`,
+        : `${highMatchCount} strong or excellent matches (70%+)`,
       icon: <Compass size={20} />,
       color: 'var(--primary)',
       destination: 'recommendations' as const,
@@ -474,8 +475,7 @@ export default function DashboardView() {
                 marginBottom: 14,
               }}
             >
-              Exploring a shortlist drawn from
-              {' '}{catalog.length} O*NET occupations.
+              Evaluated {evaluatedCount} of {catalog.length} available O*NET occupations.
             </p>
           )}
 
@@ -576,11 +576,12 @@ export default function DashboardView() {
                     </span>
 
                     <span
-                      className={`match-badge ${
-                        match.score >= 80
-                          ? 'match-high'
-                          : 'match-med'
-                      }`}
+                      className="match-badge"
+                      title={getMatchPresentation(match.score).label}
+                      style={{
+                        backgroundColor: getMatchPresentation(match.score).background,
+                        color: getMatchPresentation(match.score).color,
+                      }}
                     >
                       {match.score}%
                     </span>
