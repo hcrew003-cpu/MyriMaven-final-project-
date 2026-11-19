@@ -31,9 +31,11 @@ export interface OnetCareer {
 type PreferenceKey = keyof UserProfile['preferences'];
 type RankedCareer = Career & { dynamicScore: number; delta: number; scenarioNote: string };
 
+export type OccupationalFilter = 'all' | 'other' | 'creative' | 'business' | 'tech' | '11' | '13' | '15' | '17' | '19' | '21' | '23' | '25' | '27' | '29' | '31' | '33' | '35' | '37' | '39' | '41' | '43' | '45' | '47' | '49' | '51' | '53' | '55';
+
 export interface RecommendationNavigation {
   mode: 'recommended' | 'browse';
-  filter: 'all' | 'creative' | 'business' | 'tech';
+  filter: OccupationalFilter;
   explorationFilter: 'all' | 'best' | 'related' | 'unexpected';
   query: string;
   page: number;
