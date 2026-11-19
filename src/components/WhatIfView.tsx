@@ -6,6 +6,7 @@ import { useCareer } from '../context/CareerContext';
 import type { OnetCareer } from '../context/CareerContext';
 import type { WhatIfState, UserProfile } from '../types/career';
 import { calculateOnetMatch } from '../lib/onetMatching';
+import { getMatchPresentation } from '../lib/matchPresentation';
 import { ALL_INTERESTS, ALL_SKILLS } from '../data/careersData';
 import {
   loadWhatIfScenarios,
@@ -1060,6 +1061,8 @@ Work location is estimated only when duties provide clear on-site evidence; remo
         >
           {rankedCareers.map((item, index) => {
             const { career } = item;
+            const presentation = getMatchPresentation(item.score);
+            const baselinePresentation = getMatchPresentation(item.baseline);
             const saved = isSaved(career.id);
             const comparing = isComparing(career.id);
 
@@ -1097,11 +1100,9 @@ Work location is estimated only when duties provide clear on-site evidence; remo
                     </div>
 
                     <span
-                      className={`match-badge ${
-                        item.score >= 80
-                          ? 'match-high'
-                          : 'match-med'
-                      }`}
+                      className="match-badge"
+                      style={{ backgroundColor: presentation.background, color: presentation.color }}
+                      title={presentation.label}
                     >
                       {item.score}% Estimate
                     </span>
@@ -1156,8 +1157,8 @@ Work location is estimated only when duties provide clear on-site evidence; remo
                     )}
 
                     <div style={{ marginTop: 6 }}>
-                      Baseline: {item.baseline}% ·
-                      Scenario: {item.score}%
+                      Baseline: <strong style={{ color: baselinePresentation.color }}>{item.baseline}%</strong> ·{' '}
+                      Scenario: <strong style={{ color: presentation.color }}>{item.score}%</strong>
                     </div>
                   </div>
 
