@@ -27,8 +27,8 @@ const EXPLORATION_OPTIONS: [ExplorationFilter, string][] = [
 ];
 const EXPLORATION_DESCRIPTIONS: Record<ExplorationFilter, string> = {
   best: 'Your strongest available matches, balancing occupational alignment and overall compatibility. Review individual estimates and evidence before deciding.',
-  related: 'Explore careers that build on your interests, strengths or enabled career background.',
-  unexpected: 'Discover careers outside your leading occupational fields through transferable skills, interests or goals.',
+  related: 'Explore careers with meaningful connections to your leading matches, including shared interests and occupational relationships.',
+  unexpected: 'Discover less obvious career directions supported by your interests, transferable strengths, goals or enabled career background.',
   all: 'View every evaluated occupation, including those with limited matching evidence.',
 };
 const PAGE_SIZE = 30;
@@ -108,62 +108,74 @@ export default function RecommendationsView() {
   const backgroundLabels = [userProfile.major, userProfile.minor]
     .filter((value): value is string => Boolean(value?.trim()));
 
-  // Occupational relationships guide categories; compatibility scores are unchanged.
+  // Category placement uses occupational evidence, not changes to match scores.
   const exploration = useMemo(() => {
+    const broad = new Set(['Communication', 'Problem Solving', 'Leadership']);
+    const selected = [...new Set(userProfile.interests ?? [])];
+    const specific = selected.filter(interest => !broad.has(interest));
+    const hasSpecific = specific.length > 0;
     const rows = rankedCareers.map(entry => {
       const { interests, skills, goals } = entry.match.breakdown;
       const alignment = entry.match.occupationalAlignment ?? interests ?? 0;
       const skill = skills ?? 0;
       const goal = goals ?? 0;
-      const dutyScores = Object.values(entry.match.dutyInterestScores ?? {});
-      const dutyPeak = Math.max(0, ...dutyScores);
-      const dutyCount = dutyScores.filter(score => score >= 35).length;
-      const coreCount = entry.match.coreInterestMatches?.length ?? 0;
+      const duties = entry.match.dutyInterestScores ?? {};
+      const dutyPeak = Math.max(0, ...Object.values(duties));
+      const specificPeak = Math.max(0, ...specific.map(interest => duties[interest] ?? 0));
+      const broadCount = selected.filter(interest => broad.has(interest) && (duties[interest] ?? 0) >= 35).length;
+      const core = new Set(entry.match.coreInterestMatches ?? []);
       const background = userProfile.useCareerBackground === true ? entry.background?.strength ?? 0 : 0;
       const group = entry.career.id.split('-')[0];
       const family = entry.career.id.slice(0, 5);
       const relatedCodes = new Set((entry.career.relatedOccupations?.occupation ?? []).map(item => item.code));
-      const evidence = alignment >= 25 || dutyPeak >= 30 || goal >= 40;
-      const transfer = skill >= 55 && (dutyPeak >= 20 || goal >= 25 || alignment >= 20);
-      const support = alignment * .40 + dutyPeak * .25 + skill * .20 + goal * .15;
-      const bestRank = entry.match.score * .70 + alignment * .20 + dutyPeak * .10 + background * 2;
-      return { entry, group, family, relatedCodes, alignment, skill, goal, dutyPeak, dutyCount, coreCount, background, evidence, transfer, support, bestRank };
+      const direct = hasSpecific ? specificPeak >= 35 : dutyPeak >= 35;
+      const support = alignment * .40 + (hasSpecific ? specificPeak : dutyPeak) * .25 + skill * .20 + goal * .15;
+      const bestRank = entry.match.score * .70 + alignment * .20 + (hasSpecific ? specificPeak : dutyPeak) * .10 + background * 2;
+      return { entry, group, family, relatedCodes, alignment, skill, goal, dutyPeak, specificPeak, broadCount, core, background, direct, support, bestRank };
     });
     type Row = (typeof rows)[number];
-    const diverse = (pool: Row[], limit: number, familyLimit: number, groupLimit: number) => {
-      if (limit <= 0) return [];
+    const diverse = (pool: Row[], limit: number, familyLimit: number, groupLimit: number, initial: Row[] = []) => {
+      const result = [...initial];
       const families = new Map<string, number>();
       const groups = new Map<string, number>();
-      const result: Row[] = [];
+      for (const row of initial) {
+        families.set(row.family, (families.get(row.family) ?? 0) + 1);
+        groups.set(row.group, (groups.get(row.group) ?? 0) + 1);
+      }
       for (const row of pool) {
+        if (result.length >= limit) break;
         if ((families.get(row.family) ?? 0) >= familyLimit || (groups.get(row.group) ?? 0) >= groupLimit) continue;
         result.push(row);
         families.set(row.family, (families.get(row.family) ?? 0) + 1);
         groups.set(row.group, (groups.get(row.group) ?? 0) + 1);
-        if (result.length >= limit) break;
       }
       return result;
     };
-    const eligible = rows.filter(row => row.entry.match.reasons.length > 0 && (row.evidence || row.transfer));
-    const bestPool = eligible.filter(row => row.evidence && row.entry.match.score >= 40)
+    const eligible = rows.filter(row => row.entry.match.reasons.length > 0 && row.entry.match.score >= 40);
+    const bestPool = eligible.filter(row => row.direct || (!selected.length && (row.skill >= 55 || row.goal >= 40)))
       .sort((a,b) => b.bestRank-a.bestRank || b.entry.match.score-a.entry.match.score);
-    // Protect the strongest six; apply diversity only to the remaining slots.
     const anchors = bestPool.slice(0, 6);
     const anchorIds = new Set(anchors.map(row => row.entry.career.id));
-    const best = [...anchors, ...diverse(bestPool.filter(row => !anchorIds.has(row.entry.career.id)), 12 - anchors.length, 2, 4)];
+    const best = diverse(bestPool.filter(row => !anchorIds.has(row.entry.career.id)), 12, 3, 6, anchors);
     const bestIds = new Set(best.map(row => row.entry.career.id));
     const remaining = eligible.filter(row => !bestIds.has(row.entry.career.id));
     const linked = (a: Row, b: Row) => a.relatedCodes.has(b.entry.career.id) || b.relatedCodes.has(a.entry.career.id);
-    const domain = (group: string) => group === '29' || group === '31' ? 'healthcare' : group;
-    const adjacent = (row: Row) => anchors.some(anchor => row.family === anchor.family || linked(row, anchor) || domain(row.group) === domain(anchor.group));
-    const related = diverse(remaining.filter(row => adjacent(row) && (row.evidence || row.transfer))
+    const adjacent = (row: Row) => anchors.some(anchor => {
+      const sharedCore = [...row.core].some(interest => anchor.core.has(interest));
+      return sharedCore || (linked(row, anchor) && (row.direct || row.alignment >= 25 || row.goal >= 40)) ||
+        (row.family === anchor.family && row.direct);
+    });
+    const related = diverse(remaining.filter(row => adjacent(row))
       .sort((a,b) => (b.support + b.entry.match.score * .35 + b.background * 2) - (a.support + a.entry.match.score * .35 + a.background * 2)), 12, 3, 5);
     const relatedIds = new Set(related.map(row => row.entry.career.id));
-    const unexpected = diverse(remaining.filter(row => !relatedIds.has(row.entry.career.id) && !adjacent(row) && row.entry.match.score >= 40 &&
-      ((row.coreCount > 0 && row.dutyPeak >= 30) || row.transfer || (row.dutyPeak >= 25 && row.goal >= 30)))
-      .sort((a,b) => (b.support + b.entry.match.score * .30) - (a.support + a.entry.match.score * .30)), 8, 1, 2);
+    const unexpected = diverse(remaining.filter(row => !relatedIds.has(row.entry.career.id) && !adjacent(row) && (
+      (row.direct && row.skill >= 45) ||
+      (row.background >= .35 && row.skill >= 55 && (row.dutyPeak >= 25 || row.goal >= 30)) ||
+      (row.skill >= 55 && row.goal >= 40 && row.dutyPeak >= 30) ||
+      (!hasSpecific && row.skill >= 55 && row.broadCount >= 2)
+    )).sort((a,b) => (b.support + b.entry.match.score * .30 + b.background * 5) - (a.support + a.entry.match.score * .30 + a.background * 5)), 8, 1, 2);
     return { all: rankedCareers, best: best.map(row => row.entry), related: related.map(row => row.entry), unexpected: unexpected.map(row => row.entry) };
-  }, [rankedCareers, userProfile.useCareerBackground]);
+  }, [rankedCareers, userProfile.useCareerBackground, userProfile.interests]);
 
   const recommended = exploration[explorationFilter];
   const unscoredGoalNotes = useMemo(() => Array.from(new Set(
