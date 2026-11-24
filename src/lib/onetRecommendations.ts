@@ -277,6 +277,27 @@ function titleStrength(title: string, terms: string[]): number {
   }, 0);
 }
 
+// Presentation labels only; never use these to calculate title strength.
+function formatBackgroundTerm(term: string): string {
+  const labels: Record<string, string> = {
+    advertis: 'advertising', psycholog: 'psychology', fundrais: 'fundraising',
+    counsel: 'counselling', account: 'accounting', sustainab: 'sustainability',
+    ecolog: 'ecology', hydrolog: 'hydrology', nurs: 'nursing',
+    'community service manager': 'community service management',
+    'general manager': 'general management', 'operations manager': 'operations management',
+    'management analyst': 'management analysis', auditor: 'auditing',
+    buyer: 'purchasing', 'event planner': 'event planning',
+    engineer: 'engineering', developer: 'software development',
+    programmer: 'programming', architect: 'architecture', artist: 'art',
+    teacher: 'teaching', instructor: 'instruction', writer: 'writing',
+    financial: 'finance', environment: 'environmental work',
+    'natural resource': 'natural resources', 'credit analyst': 'credit analysis',
+    'communications specialist': 'communications', 'communications manager': 'communications management',
+    'communications teachers': 'communications education',
+  };
+  return labels[term] ?? term;
+}
+
 /**
  * Separate title-based background signal, not a compatibility percentage.
  * Only strong, field-specific title connections receive a ranking boost.
@@ -289,7 +310,7 @@ export function getCareerBackgroundRelevance(
   const matchedTerms = terms.filter(term => titleStrength(career.title, [term]) === 1);
   return {
     strength: matchedTerms.length ? 1 : 0,
-    matchedTerms,
+    matchedTerms: [...new Set(matchedTerms.map(formatBackgroundTerm))],
   };
 }
 
