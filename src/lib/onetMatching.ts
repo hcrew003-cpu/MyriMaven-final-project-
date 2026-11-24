@@ -603,7 +603,12 @@ function readableEvidence(terms: string[]): string {
     artistic: 'artistic work',
     environmental: 'environmental work',
     environment: 'environmental work',
-    'natural environment': 'environmental work',
+    'natural environment': 'the natural environment',
+    'environmental protection': 'protecting the environment',
+    'environmental impact': 'environmental impact assessment',
+    'statistics': 'statistical analysis',
+    'statistician': 'statistical analysis',
+    'advertising': 'advertising-related work',
     quantitative: 'quantitative analysis',
     'assist clients': 'client assistance',
     'marketing policies': 'marketing strategy',
@@ -694,7 +699,6 @@ function readableEvidence(terms: string[]): string {
     'paramedic': 'paramedic duties',
     'supervisor': 'supervision',
     'data scientist': 'data science',
-    'statistician': 'statistical work',
     'software engineer': 'software engineering',
     'environmental engineer': 'environmental engineering',
     'entrepreneur': 'entrepreneurship',
@@ -726,6 +730,29 @@ function readableEvidence(terms: string[]): string {
   return (distinct.length ? distinct : unique)
     .slice(0, 2)
     .join(' and ');
+}
+
+// Presentation only: prefer documented duties when explaining a skill.
+function describeSkillConnection(
+  skillName: string,
+  sections: Sections,
+  terms: readonly string[],
+  fallback: string[]
+): string {
+  const duties = matchingTerms(`${sections.description} ${sections.tasks}`, terms);
+  const label = skillName.toLowerCase();
+  if (duties.length) {
+    return `Your self-rated strength in ${label} may support work involving ${readableEvidence(duties)}.`;
+  }
+  return `Your self-rated strength in ${label} may be transferable to this occupation, which lists or references ${readableEvidence(fallback)}.`;
+}
+
+function describeInterestConnection(interest: string, evidence: string[]): string {
+  const label = interest === 'Environment' ? 'the environment' : interest.toLowerCase();
+  if (interest === 'Creativity' && evidence.every(term => term === 'advertising')) {
+    return 'This occupation involves advertising-related work, which may connect with your interest in creativity. Review the actual duties to see how much creative work is involved.';
+  }
+  return `Your interest in ${label} may connect with this occupation’s focus on ${readableEvidence(evidence)}.`;
 }
 
 function average(values: number[]): number | null {
@@ -1147,7 +1174,7 @@ export function calculateOnetMatch(
       matchedInterests.push(interest);
 
       rankedReasons.push({
-        text: `This career may appeal to your interest in ${interest.toLowerCase()} because it involves ${readableEvidence(evidence.evidence)}.`,
+        text: describeInterestConnection(interest, dutyEvidence.evidence.length ? dutyEvidence.evidence : evidence.evidence),
         strength: isTransferable && hasSpecificInterests
           ? adjustedScore
           : evidence.score + 25,
@@ -1241,11 +1268,10 @@ export function calculateOnetMatch(
 
     if (rating >= 4 && relevance >= 45) {
       rankedReasons.push({
-        text: `Your self-rated strength in ${skillName.toLowerCase()} may be useful for ${readableEvidence(
-          direct.length
-            ? direct.map(skill => skill.name.toLowerCase())
-            : evidence.evidence
-        )}.`,
+        text: describeSkillConnection(
+          skillName, sections, terms,
+          direct.length ? direct.map(skill => skill.name.toLowerCase()) : evidence.evidence
+        ),
         strength: relevance * readiness / 100 * 0.75,
       });
     } else if (
@@ -1400,7 +1426,7 @@ export function calculateOnetMatch(
 
     if (evidence.score >= 35) {
       rankedReasons.push({
-        text: `This career connects with your goal of ${goal.toLowerCase()} through ${readableEvidence(evidence.evidence)}.`,
+        text: `The documented duties involve ${readableEvidence(evidence.evidence)}, which may support your goal of ${goal.toLowerCase()}.`,
         strength: evidence.score + 5,
       });
     }
