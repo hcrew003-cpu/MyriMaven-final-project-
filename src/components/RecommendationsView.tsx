@@ -192,7 +192,12 @@ export default function RecommendationsView() {
     return { all: rankedCareers, best: best.map(row => row.entry), related: related.map(row => row.entry), unexpected: unexpected.map(row => row.entry) };
   }, [rankedCareers, userProfile.useCareerBackground, userProfile.interests]);
 
-  const recommended = exploration[explorationFilter];
+  // Sort displayed careers by match score without changing category membership.
+  // Stable sorting preserves the internal ranking when match scores are equal.
+  const recommended = useMemo(
+    () => [...exploration[explorationFilter]].sort((a, b) => b.match.score - a.match.score),
+    [exploration, explorationFilter]
+  );
   const unscoredGoalNotes = useMemo(() => Array.from(new Set(
     rankedCareers.flatMap(({ match }) => match.considerations.filter(item => item.startsWith('Not scored:')))
   )), [rankedCareers]);
