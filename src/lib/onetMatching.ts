@@ -1093,6 +1093,8 @@ export function calculateOnetMatch(
 
   // INTERESTS
   const interestScores: number[] = [];
+  const directInterestScores: number[] = [];
+  const transferableInterestScores: number[] = [];
   const matchedInterests: string[] = [];
   const coreInterestMatches: string[] = [];
   const dutyInterestScores: Record<string, number> = {};
@@ -1105,18 +1107,27 @@ export function calculateOnetMatch(
     'Leadership',
   ]);
 
-  for (
-    const interest of new Set(
-      (scenarioProfile?.interests ?? profile.interests) ?? []
-    )
-  ) {
+  const selectedInterests = [...new Set((scenarioProfile?.interests ?? profile.interests) ?? [])];
+  const hasSpecificInterests = selectedInterests.some(interest => !broadInterests.has(interest));
+
+  for (const interest of selectedInterests) {
     const terms = INTEREST_TERMS[interest] ?? [
       normalize(interest),
     ];
 
     const evidence = interestEvidence(sections, terms);
 
-    interestScores.push(evidence.score);
+    const isTransferable = broadInterests.has(interest);
+    if (isTransferable) {
+      transferableInterestScores.push(evidence.score);
+    } else {
+      directInterestScores.push(evidence.score);
+    }
+    // Broad interests remain valid but cannot substitute for a selected field.
+    const adjustedScore = isTransferable && hasSpecificInterests
+      ? Math.round(evidence.score * 0.65)
+      : evidence.score;
+    interestScores.push(adjustedScore);
 
     const dutyEvidence = interestEvidence(
       { ...sections, knowledge: '' },
@@ -1137,7 +1148,9 @@ export function calculateOnetMatch(
 
       rankedReasons.push({
         text: `This career may appeal to your interest in ${interest.toLowerCase()} because it involves ${readableEvidence(evidence.evidence)}.`,
-        strength: evidence.score + 15,
+        strength: isTransferable && hasSpecificInterests
+          ? adjustedScore
+          : evidence.score + 25,
       });
     }
   }
@@ -1167,6 +1180,17 @@ export function calculateOnetMatch(
       overallAverage * 0.30
     );
   })();
+
+  // Field alignment is separate from overall compatibility. A profile
+  // containing only broad interests still receives an alignment estimate.
+  const summarizeAlignment = (scores: number[]) =>
+    (average([...scores].sort((a, b) => b - a).slice(0, 2)) ?? 0) * 0.5 +
+    (average(scores) ?? 0) * 0.5;
+  const occupationalAlignment = hasSpecificInterests
+    ? Math.round(summarizeAlignment(directInterestScores) *
+        (transferableInterestScores.length ? 0.85 : 1) +
+        summarizeAlignment(transferableInterestScores) * 0.15)
+    : Math.round(summarizeAlignment(transferableInterestScores));
 
   // SKILLS
   const skillScores: number[] = [];
@@ -1222,7 +1246,7 @@ export function calculateOnetMatch(
             ? direct.map(skill => skill.name.toLowerCase())
             : evidence.evidence
         )}.`,
-        strength: relevance * readiness / 100,
+        strength: relevance * readiness / 100 * 0.75,
       });
     } else if (
       rating <= 2 &&
@@ -1493,10 +1517,7 @@ export function calculateOnetMatch(
 
   return {
     score: clamp(score),
-    occupationalAlignment: interestScores.length ? Math.round(
-      (average([...interestScores].sort((a, b) => b - a).slice(0, 2)) ?? 0) * 0.5 +
-      (average(interestScores) ?? 0) * 0.5
-    ) : 0,
+    occupationalAlignment,
     matchedInterests,
     coreInterestMatches,
     dutyInterestScores,
