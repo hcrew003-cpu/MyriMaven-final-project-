@@ -32,6 +32,18 @@ const CATEGORY_WEIGHTS: Record<MatchCategory, number> = {
 
 const INTEREST_TERMS: Record<string, string[]> = {
   "Technology": [
+    "software applications",
+    "information systems",
+    "computer science",
+    "software systems",
+    "database management",
+    "network security",
+    "computer programming",
+    "web development",
+    "systems analysis",
+    "software testing",
+    "computer hardware",
+    "cloud computing",
     "software development",
     "develop software",
     "programming",
@@ -49,6 +61,12 @@ const INTEREST_TERMS: Record<string, string[]> = {
     "software engineer"
   ],
   "Business": [
+    "business analysis",
+    "financial analysis",
+    "business intelligence",
+    "business processes",
+    "sales management",
+    "organizational performance",
     "business administration",
     "business strategy",
     "marketing",
@@ -74,6 +92,11 @@ const INTEREST_TERMS: Record<string, string[]> = {
     "inventory management"
   ],
   "Helping People": [
+    "patient support",
+    "case management",
+    "counseling services",
+    "support services",
+    "assist individuals",
     "counsel",
     "psychotherapy",
     "mental health treatment",
@@ -103,9 +126,14 @@ const INTEREST_TERMS: Record<string, string[]> = {
     "therapist"
   ],
   "Creativity": [
+    "creative direction",
+    "visual concepts",
+    "design graphics",
+    "create designs",
+    "develop advertising campaigns",
+    "write scripts",
     "artistic",
     "creative",
-    "advertising",
     "visual design",
     "graphic design",
     "originality",
@@ -128,6 +156,12 @@ const INTEREST_TERMS: Record<string, string[]> = {
     "develop concepts"
   ],
   "Environment": [
+    "environmental management",
+    "water resources",
+    "environmental monitoring",
+    "natural resource management",
+    "ecological research",
+    "environmental assessment",
     "environmental protection",
     "environmental science",
     "environmental engineer",
@@ -151,6 +185,10 @@ const INTEREST_TERMS: Record<string, string[]> = {
     "climate change"
   ],
   "Problem Solving": [
+    "solve problems",
+    "identify solutions",
+    "evaluate solutions",
+    "resolve issues",
     "problem solving",
     "troubleshooting",
     "critical thinking",
@@ -166,6 +204,10 @@ const INTEREST_TERMS: Record<string, string[]> = {
     "develop solutions"
   ],
   "Leadership": [
+    "supervise personnel",
+    "direct staff",
+    "manage teams",
+    "oversee staff",
     "manage staff",
     "manage personnel",
     "manage employees",
@@ -185,6 +227,23 @@ const INTEREST_TERMS: Record<string, string[]> = {
     "allocate resources"
   ],
   "Working with Data": [
+    "business intelligence",
+    "mathematical modeling",
+    "data mining",
+    "optimization models",
+    "database queries",
+    "statistical methods",
+    "statistical techniques",
+    "quantitative methods",
+    "operations research",
+    "data processing",
+    "data interpretation",
+    "analyze information",
+    "statistical models",
+    "collect data",
+    "data sets",
+    "datasets",
+    "predictive models",
     "data analysis",
     "statistics",
     "analytics",
@@ -204,6 +263,10 @@ const INTEREST_TERMS: Record<string, string[]> = {
     "collect research data"
   ],
   "Communication": [
+    "communicate information",
+    "prepare presentations",
+    "write reports",
+    "public information",
     "public speaking",
     "writing",
     "presentation",
@@ -226,6 +289,10 @@ const INTEREST_TERMS: Record<string, string[]> = {
     "write articles"
   ],
   "Working with Children": [
+    "child education",
+    "early learning",
+    "child psychology",
+    "school children",
     "teach children",
     "teach students",
     "child development",
@@ -244,6 +311,11 @@ const INTEREST_TERMS: Record<string, string[]> = {
     "kindergarten"
   ],
   "Healthcare": [
+    "health care",
+    "clinical care",
+    "medical diagnosis",
+    "patient assessment",
+    "diagnostic tests",
     "patient care",
     "care for patients",
     "treat patients",
@@ -273,6 +345,10 @@ const INTEREST_TERMS: Record<string, string[]> = {
     "treat mental"
   ],
   "Entrepreneurship": [
+    "business opportunities",
+    "product innovation",
+    "commercial strategy",
+    "new ventures",
     "business development",
     "entrepreneur",
     "startup",
@@ -424,7 +500,8 @@ function normalize(value: string): string {
 function matchesTerm(text: string, term: string): boolean {
   const escaped = term
     .toLowerCase()
-    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/ +/g, '[\\s-]+');
 
   return new RegExp(`\\b${escaped}\\w*\\b`, 'i').test(text);
 }
@@ -672,6 +749,9 @@ function readableEvidence(terms: string[]): string {
     'design products': 'product design',
     'develop concepts': 'concept development',
     'restore ecosystems': 'ecosystem restoration',
+    'ecosystem': 'ecosystems',
+    'analyze information': 'information analysis',
+    'collect data': 'data collection',
     'teach children': 'teaching children',
     'care for children': 'child care',
     'counsel children': 'child counseling',
@@ -686,7 +766,6 @@ function readableEvidence(terms: string[]): string {
     'launch products': 'product launches',
     'develop business models': 'business model development',
     'identify market opportunities': 'identifying market opportunities',
-    'collect data': 'data collection',
     'review literature': 'literature review',
     'evaluate evidence': 'evidence evaluation',
     'improve health': 'improving health',
@@ -1219,8 +1298,8 @@ export function calculateOnetMatch(
   // Field alignment is separate from overall compatibility. A profile
   // containing only broad interests still receives an alignment estimate.
   const summarizeAlignment = (scores: number[]) =>
-    (average([...scores].sort((a, b) => b - a).slice(0, 2)) ?? 0) * 0.5 +
-    (average(scores) ?? 0) * 0.5;
+    Math.max(0, ...scores) * 0.65 +
+    (average(scores) ?? 0) * 0.35;
   const occupationalAlignment = hasSpecificInterests
     ? Math.round(summarizeAlignment(directInterestScores) *
         (transferableInterestScores.length ? 0.85 : 1) +
@@ -1260,7 +1339,7 @@ export function calculateOnetMatch(
 
     const relevance = Math.max(
       evidence.score,
-      direct.length ? 45 : 0
+      direct.length >= 2 ? 45 : direct.length ? 30 : 0
     );
 
     if (relevance < 15) continue;
