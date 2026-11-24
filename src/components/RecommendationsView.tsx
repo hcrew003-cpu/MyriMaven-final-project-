@@ -156,13 +156,16 @@ export default function RecommendationsView() {
       .sort((a,b) => b.bestRank-a.bestRank || b.entry.match.score-a.entry.match.score);
     const anchors = bestPool.slice(0, 6);
     const anchorIds = new Set(anchors.map(row => row.entry.career.id));
-    const best = diverse(bestPool.filter(row => !anchorIds.has(row.entry.career.id)), 12, 3, 6, anchors);
+    const best = diverse(bestPool.filter(row => !anchorIds.has(row.entry.career.id) && row.bestRank >= anchors[0].bestRank * .85), 8, 3, 6, anchors);
     const bestIds = new Set(best.map(row => row.entry.career.id));
     const remaining = eligible.filter(row => !bestIds.has(row.entry.career.id));
     const linked = (a: Row, b: Row) => a.relatedCodes.has(b.entry.career.id) || b.relatedCodes.has(a.entry.career.id);
     const adjacent = (row: Row) => anchors.some(anchor => {
       const sharedCore = [...row.core].some(interest => anchor.core.has(interest));
-      return sharedCore || (linked(row, anchor) && (row.direct || row.alignment >= 25 || row.goal >= 40)) ||
+      const sharedDuty = (hasSpecific ? specific : selected).some(interest =>
+        (row.entry.match.dutyInterestScores?.[interest] ?? 0) >= 35 &&
+        (anchor.entry.match.dutyInterestScores?.[interest] ?? 0) >= 35);
+      return sharedCore || sharedDuty || (linked(row, anchor) && (row.direct || row.alignment >= 25 || row.goal >= 40)) ||
         (row.family === anchor.family && row.direct);
     });
     const related = diverse(remaining.filter(row => adjacent(row))
@@ -172,7 +175,7 @@ export default function RecommendationsView() {
       (row.direct && row.skill >= 45) ||
       (row.background >= .35 && row.skill >= 55 && (row.dutyPeak >= 25 || row.goal >= 30)) ||
       (row.skill >= 55 && row.goal >= 40 && row.dutyPeak >= 30) ||
-      (!hasSpecific && row.skill >= 55 && row.broadCount >= 2)
+      (row.skill >= 55 && row.broadCount >= 2 && (!hasSpecific || row.specificPeak >= 20 || row.goal >= 30 || row.background >= .35))
     )).sort((a,b) => (b.support + b.entry.match.score * .30 + b.background * 5) - (a.support + a.entry.match.score * .30 + a.background * 5)), 8, 1, 2);
     return { all: rankedCareers, best: best.map(row => row.entry), related: related.map(row => row.entry), unexpected: unexpected.map(row => row.entry) };
   }, [rankedCareers, userProfile.useCareerBackground, userProfile.interests]);
