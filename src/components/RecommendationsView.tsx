@@ -166,22 +166,28 @@ export default function RecommendationsView() {
     const bestIds = new Set(best.map(row => row.entry.career.id));
     const remaining = eligible.filter(row => !bestIds.has(row.entry.career.id));
     const linked = (a: Row, b: Row) => a.relatedCodes.has(b.entry.career.id) || b.relatedCodes.has(a.entry.career.id);
-    const adjacent = (row: Row) => anchors.some(anchor => {
-      const sharedCore = [...row.core].some(interest => anchor.core.has(interest));
-      const sharedDuty = (hasSpecific ? specific : selected).some(interest =>
-        (row.entry.match.dutyInterestScores?.[interest] ?? 0) >= 35 &&
-        (anchor.entry.match.dutyInterestScores?.[interest] ?? 0) >= 35);
-      return sharedCore || sharedDuty || (linked(row, anchor) && (row.direct || row.alignment >= 25 || row.goal >= 40)) ||
-        (row.family === anchor.family && row.direct);
+    const sharedInterestCount = (row: Row, anchor: Row) =>
+      (hasSpecific ? specific : selected).filter(interest =>
+        (row.core.has(interest) && anchor.core.has(interest)) ||
+        ((row.entry.match.dutyInterestScores?.[interest] ?? 0) >= 35 &&
+         (anchor.entry.match.dutyInterestScores?.[interest] ?? 0) >= 35)
+      ).length;
+    // Shared interests establish relevance, not necessarily occupational closeness.
+    const adjacent = (row: Row) => best.some(anchor => {
+      const shared = sharedInterestCount(row, anchor);
+      return (linked(row, anchor) && (row.direct || row.alignment >= 25 || row.goal >= 40)) ||
+        (row.family === anchor.family && row.direct) ||
+        (row.group === anchor.group && shared >= 1) ||
+        (shared >= 2 && row.direct);
     });
     const related = diverse(remaining.filter(row => adjacent(row))
       .sort((a,b) => (b.support + b.entry.match.score * .35 + b.background * 2) - (a.support + a.entry.match.score * .35 + a.background * 2)), 12, 3, 5);
     const relatedIds = new Set(related.map(row => row.entry.career.id));
     const unexpected = diverse(remaining.filter(row => !relatedIds.has(row.entry.career.id) && !adjacent(row) && (
-      (row.direct && row.skill >= 45) ||
-      (row.background >= .35 && row.skill >= 55 && (row.dutyPeak >= 25 || row.goal >= 30)) ||
-      (row.skill >= 55 && row.goal >= 40 && row.dutyPeak >= 30) ||
-      (row.skill >= 55 && row.broadCount >= 2 && (!hasSpecific || row.specificPeak >= 20 || row.goal >= 30 || row.background >= .35))
+      (row.direct && row.skill >= 40) ||
+      (row.skill >= 55 && row.dutyPeak >= 30 && (row.goal >= 30 || row.broadCount >= 2)) ||
+      (row.skill >= 50 && row.goal >= 40 && row.dutyPeak >= 25) ||
+      (row.background >= .35 && row.skill >= 55 && (row.dutyPeak >= 25 || row.goal >= 30))
     )).sort((a,b) => (b.support + b.entry.match.score * .30 + b.background * 5) - (a.support + a.entry.match.score * .30 + a.background * 5)), 8, 1, 2);
     return { all: rankedCareers, best: best.map(row => row.entry), related: related.map(row => row.entry), unexpected: unexpected.map(row => row.entry) };
   }, [rankedCareers, userProfile.useCareerBackground, userProfile.interests]);
