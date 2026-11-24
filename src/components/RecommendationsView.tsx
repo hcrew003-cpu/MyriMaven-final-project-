@@ -74,6 +74,12 @@ function categoryMatch(id: string, filter: Filter): boolean {
   return group === filter;
 }
 
+function formatConnectionTerms(terms: string[]): string {
+  if (terms.length <= 1) return terms[0] ?? 'related areas of study';
+  if (terms.length === 2) return terms.join(' and ');
+  return `${terms.slice(0, -1).join(', ')}, and ${terms[terms.length - 1]}`;
+}
+
 export default function RecommendationsView() {
   const {
     userProfile,
@@ -542,8 +548,8 @@ export default function RecommendationsView() {
                                 </strong>
                                 <p style={{ marginTop: 6 }}>
                                   {backgroundLabels.length
-                                    ? `Your studies (${backgroundLabels.join(' and ')}) may be relevant to this occupation through ${background.matchedTerms.slice(0, 3).join(', ')}.`
-                                    : `Your career background may connect to this occupation through ${background.matchedTerms.slice(0, 3).join(', ')}.`}
+                                    ? `Your studies (${backgroundLabels.join(' and ')}) may be relevant to this occupation through ${formatConnectionTerms(background.matchedTerms.slice(0, 3))}.`
+                                    : `Your career background may connect to this occupation through ${formatConnectionTerms(background.matchedTerms.slice(0, 3))}.`}
                                   {' '}This is a possible connection, not a qualification assessment.
                                 </p>
                               </div>
