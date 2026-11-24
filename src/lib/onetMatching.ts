@@ -11,6 +11,8 @@ export interface OnetMatchResult {
   matchedInterests?: string[];
   coreInterestMatches?: string[];
   dutyInterestScores?: Record<string, number>;
+  supportedTransferableInterests?: string[];
+  specificInterestAlignment?: number;
   goalAlignment?: number | null;
   breakdown: {
     interests: number | null;
@@ -741,6 +743,14 @@ function readableEvidence(terms: string[]): string {
     'write articles': 'article writing',
     'create artwork': 'artwork creation',
     'design layouts': 'layout design',
+    'create designs': 'design creation',
+    'design graphics': 'graphic design',
+    'develop advertising campaigns': 'advertising campaign development',
+    'write scripts': 'scriptwriting',
+    'solve problems': 'problem solving',
+    'identify solutions': 'identifying solutions',
+    'evaluate solutions': 'evaluating solutions',
+    'resolve issues': 'issue resolution',
     'compose music': 'music composition',
     'perform music': 'musical performance',
     'choreograph': 'choreography',
@@ -1212,6 +1222,7 @@ export function calculateOnetMatch(
   const matchedInterests: string[] = [];
   const coreInterestMatches: string[] = [];
   const dutyInterestScores: Record<string, number> = {};
+  const supportedTransferableInterests: string[] = [];
 
   // Broad transferable interests are distinguished
   // from more occupation-specific interests.
@@ -1248,7 +1259,19 @@ export function calculateOnetMatch(
       terms
     );
 
-    dutyInterestScores[interest] = dutyEvidence.score;
+    // Require repeated duty evidence for broad cross-field connections.
+    const matchingDutyCount = sections.taskItems.filter(task =>
+      matchingTerms(task, terms).length > 0
+    ).length;
+    const descriptionHits = matchingTerms(sections.description, terms);
+    const supportedTransfer = matchingDutyCount >= 2 &&
+      (descriptionHits.length > 0 || matchingDutyCount >= 3);
+    if (isTransferable && supportedTransfer && dutyEvidence.score >= 35) {
+      supportedTransferableInterests.push(interest);
+    }
+    dutyInterestScores[interest] = isTransferable && hasSpecificInterests && !supportedTransfer
+      ? Math.min(24, dutyEvidence.score)
+      : dutyEvidence.score;
 
     if (
       !broadInterests.has(interest) &&
@@ -1257,7 +1280,7 @@ export function calculateOnetMatch(
       coreInterestMatches.push(interest);
     }
 
-    if (evidence.score >= 35) {
+    if (evidence.score >= 35 && (!isTransferable || !hasSpecificInterests || supportedTransfer)) {
       matchedInterests.push(interest);
 
       rankedReasons.push({
@@ -1631,6 +1654,8 @@ export function calculateOnetMatch(
   return {
     score: clamp(score),
     occupationalAlignment,
+    specificInterestAlignment: Math.round(summarizeAlignment(directInterestScores)),
+    supportedTransferableInterests,
     matchedInterests,
     coreInterestMatches,
     dutyInterestScores,
