@@ -128,11 +128,11 @@ export default function RecommendationsView() {
       const duties = entry.match.dutyInterestScores ?? {};
       const dutyPeak = Math.max(0, ...Object.values(duties));
       const specificPeak = Math.max(0, ...specific.map(interest => duties[interest] ?? 0));
-      const broadCount = selected.filter(interest => broad.has(interest) && (duties[interest] ?? 0) >= 35).length;
+      const broadCount = (entry.match.supportedTransferableInterests ?? []).filter(interest => selected.includes(interest) && broad.has(interest)).length;
       const core = new Set(entry.match.coreInterestMatches ?? []);
       const background = userProfile.useCareerBackground === true ? entry.background?.strength ?? 0 : 0;
       const group = entry.career.id.split('-')[0];
-      const family = entry.career.id.slice(0, 5);
+      const family = entry.career.id.split(".")[0].slice(0, 6);
       const relatedCodes = new Set((entry.career.relatedOccupations?.occupation ?? []).map(item => item.code));
       const direct = hasSpecific ? specificPeak >= 35 : dutyPeak >= 35;
       const support = alignment * .40 + (hasSpecific ? specificPeak : dutyPeak) * .25 + skill * .20 + goal * .15;
@@ -160,9 +160,9 @@ export default function RecommendationsView() {
     const eligible = rows.filter(row => row.entry.match.reasons.length > 0 && row.entry.match.score >= 40);
     const bestPool = eligible.filter(row => row.direct || (!selected.length && (row.skill >= 55 || row.goal >= 40)))
       .sort((a,b) => b.bestRank-a.bestRank || b.entry.match.score-a.entry.match.score);
-    const anchors = bestPool.slice(0, 6);
+    const anchors = diverse(bestPool, 6, 3, 6);
     const anchorIds = new Set(anchors.map(row => row.entry.career.id));
-    const best = diverse(bestPool.filter(row => !anchorIds.has(row.entry.career.id) && row.bestRank >= anchors[0].bestRank * .85), 8, 3, 6, anchors);
+    const best = diverse(bestPool.filter(row => !anchorIds.has(row.entry.career.id) && row.bestRank >= (anchors[0]?.bestRank ?? 0) * .85), 8, 3, 6, anchors);
     const bestIds = new Set(best.map(row => row.entry.career.id));
     const remaining = eligible.filter(row => !bestIds.has(row.entry.career.id));
     const linked = (a: Row, b: Row) => a.relatedCodes.has(b.entry.career.id) || b.relatedCodes.has(a.entry.career.id);
@@ -178,16 +178,18 @@ export default function RecommendationsView() {
       return (linked(row, anchor) && (row.direct || row.alignment >= 25 || row.goal >= 40)) ||
         (row.family === anchor.family && row.direct) ||
         (row.group === anchor.group && shared >= 1) ||
-        (shared >= 2 && row.direct);
+        (shared >= 2 && row.direct) ||
+        (hasSpecific && shared >= 1 && row.specificPeak >= 45 && anchor.specificPeak >= 45);
     });
     const related = diverse(remaining.filter(row => adjacent(row))
       .sort((a,b) => (b.support + b.entry.match.score * .35 + b.background * 2) - (a.support + a.entry.match.score * .35 + a.background * 2)), 12, 3, 5);
     const relatedIds = new Set(related.map(row => row.entry.career.id));
     const unexpected = diverse(remaining.filter(row => !relatedIds.has(row.entry.career.id) && !adjacent(row) && (
       (row.direct && row.skill >= 40) ||
-      (row.skill >= 55 && row.dutyPeak >= 30 && (row.goal >= 30 || row.broadCount >= 2)) ||
-      (row.skill >= 50 && row.goal >= 40 && row.dutyPeak >= 25) ||
-      (row.background >= .35 && row.skill >= 55 && (row.dutyPeak >= 25 || row.goal >= 30))
+      (hasSpecific && row.specificPeak >= 25 && row.skill >= 50 && (row.broadCount >= 1 || row.goal >= 40)) ||
+      (hasSpecific && row.background >= .35 && row.skill >= 55 && row.broadCount >= 1 && (row.specificPeak >= 20 || row.goal >= 40 || row.broadCount >= 2)) ||
+      (!hasSpecific && row.skill >= 50 && row.broadCount >= 1 && (row.goal >= 35 || row.background >= .35 || row.broadCount >= 2)) ||
+      (!selected.length && row.background >= .35 && row.skill >= 55 && row.goal >= 40)
     )).sort((a,b) => (b.support + b.entry.match.score * .30 + b.background * 5) - (a.support + a.entry.match.score * .30 + a.background * 5)), 8, 1, 2);
     return { all: rankedCareers, best: best.map(row => row.entry), related: related.map(row => row.entry), unexpected: unexpected.map(row => row.entry) };
   }, [rankedCareers, userProfile.useCareerBackground, userProfile.interests]);
@@ -457,7 +459,7 @@ export default function RecommendationsView() {
 
                 {userProfile.useCareerBackground === true && (
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 18 }}>
-                    Career background included. Your background helps uncover additional career possibilities without changing your match scores.
+                    Career background included. Your education or experience may change which careers appear and their ranking, but does not change your estimated match percentages.
                   </p>
                 )}
 
