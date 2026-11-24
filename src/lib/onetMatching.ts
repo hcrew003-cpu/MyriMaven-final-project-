@@ -741,10 +741,18 @@ function describeSkillConnection(
 ): string {
   const duties = matchingTerms(`${sections.description} ${sections.tasks}`, terms);
   const label = skillName.toLowerCase();
-  if (duties.length) {
-    return `Your self-rated strength in ${label} may support work involving ${readableEvidence(duties)}.`;
+  const specific = duties.filter(term => normalize(term) !== label);
+  if (specific.length) {
+    return `Your self-rated strength in ${label} may help with duties involving ${readableEvidence(specific)}.`;
   }
-  return `Your self-rated strength in ${label} may be transferable to this occupation, which lists or references ${readableEvidence(fallback)}.`;
+  if (duties.length) {
+    return `This occupation's documented duties involve ${readableEvidence(duties)}, an area you rated as a personal strength.`;
+  }
+  const distinct = fallback.filter(term => normalize(term) !== label);
+  if (distinct.length) {
+    return `Your self-rated strength in ${label} may be transferable to this occupation, which lists or references ${readableEvidence(distinct)}.`;
+  }
+  return `Available occupation information references ${label}, an area you rated as a personal strength.`;
 }
 
 function describeInterestConnection(interest: string, evidence: string[]): string {
