@@ -97,7 +97,8 @@ export default function Navbar() {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '10px 14px',
+    padding: '10px 8px',
+    flexShrink: 0,
     borderRadius: '10px',
     backgroundColor: isActive
       ? 'rgba(12, 105, 87, 0.12)'
@@ -130,22 +131,44 @@ export default function Navbar() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 20px;
+          gap: 12px;
+          box-sizing: border-box;
         }
 
         .mm-nav-desktop {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 4px;
-          flex: 1;
-          min-width: 0;
+          gap: 2px;
+          flex: 1 0 auto;
+          min-width: max-content;
         }
 
         .mm-nav-actions {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+
+        .mm-nav .brand-logo {
+          flex-shrink: 0;
+          white-space: nowrap;
+        }
+
+        .mm-nav .user-badge {
+          max-width: 150px;
+        }
+
+        .mm-nav .user-badge > span {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .mm-nav .avatar-circle {
+          flex-shrink: 0;
         }
 
         .mm-nav-mobile-toggle {
@@ -154,6 +177,7 @@ export default function Navbar() {
           justify-content: center;
           width: 44px;
           height: 44px;
+          flex-shrink: 0;
           border-radius: 10px;
           border: 1px solid var(--border);
           background: white;
@@ -191,7 +215,7 @@ export default function Navbar() {
           font-weight: 700;
         }
 
-        @media (max-width: 1250px) {
+        @media (max-width: 1450px) {
           .mm-nav-desktop {
             display: none;
           }
