@@ -51,7 +51,7 @@ export default function Navbar() {
     },
     {
       view: 'what-if',
-      label: 'What-If Sandbox',
+      label: 'What-If',
       icon: <Sliders size={18} />,
     },
     {
@@ -96,8 +96,8 @@ export default function Navbar() {
   ): React.CSSProperties => ({
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    padding: '10px 8px',
+    gap: '5px',
+    padding: '9px 6px',
     flexShrink: 0,
     borderRadius: '10px',
     backgroundColor: isActive
@@ -107,7 +107,7 @@ export default function Navbar() {
       ? '#0c6957'
       : 'var(--dark-slate)',
     fontWeight: isActive ? 700 : 600,
-    fontSize: '0.9rem',
+    fontSize: '0.85rem',
     cursor: 'pointer',
     border: 'none',
     whiteSpace: 'nowrap',
@@ -127,11 +127,11 @@ export default function Navbar() {
         .mm-nav-inner {
           max-width: 1600px;
           margin: 0 auto;
-          padding: 12px 24px;
+          padding: 10px 16px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
+          gap: 8px;
           box-sizing: border-box;
         }
 
@@ -157,7 +157,7 @@ export default function Navbar() {
         }
 
         .mm-nav .user-badge {
-          max-width: 150px;
+          max-width: 120px;
         }
 
         .mm-nav .user-badge > span {
@@ -215,7 +215,25 @@ export default function Navbar() {
           font-weight: 700;
         }
 
-        @media (max-width: 1450px) {
+        /* Keep all links visible on ordinary laptop screens. */
+        @media (min-width: 761px) and (max-width: 1300px) {
+          .mm-nav-inner {
+            flex-wrap: wrap;
+            row-gap: 4px;
+          }
+          .mm-nav-desktop {
+            order: 3;
+            flex: 1 0 100%;
+            min-width: 0;
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+          .mm-nav-actions {
+            margin-left: auto;
+          }
+        }
+
+        @media (max-width: 760px) {
           .mm-nav-desktop {
             display: none;
           }
